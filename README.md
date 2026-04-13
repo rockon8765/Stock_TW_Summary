@@ -54,7 +54,7 @@ python -m http.server 8000
 npx serve .
 ```
 
-策略績效摘要檔預設會從 `js/config.js` 的 `APP_CONFIG.strategyDataBaseUrl` 指定位置讀取；目前預設為 `../`，也就是讀取上一層目錄的 `strategy_ticker_holding_summary.csv` 與 `strategy_ticker_trade_analysis_summary.csv`。若部署到 GitHub Pages 或其他不同路徑，請改這個設定成對應的公開 URL 或目錄。
+策略績效摘要檔預設會從 `js/config.js` 的 `APP_CONFIG.strategyDataBaseUrl` 指定位置讀取；目前預設為 `./`，也就是直接讀取 repo 根目錄的 `strategy_ticker_holding_summary.csv` 與 `strategy_ticker_trade_analysis_summary.csv`。更新資料時，請先重新產生 summary，再同步到 `StockOnePage` repo 根目錄後部署。
 
 ## License
 

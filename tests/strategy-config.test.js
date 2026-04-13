@@ -10,9 +10,9 @@ test('uses configured base URL for strategy summary files', () => {
   });
 });
 
-test('falls back to the in-app data directory when base URL is missing', () => {
+test('defaults to repo-root strategy summary files', () => {
   assert.deepEqual(getStrategyDataUrls(), {
-    holding: 'data/strategy_ticker_holding_summary.csv',
-    trade: 'data/strategy_ticker_trade_analysis_summary.csv',
+    holding: './strategy_ticker_holding_summary.csv',
+    trade: './strategy_ticker_trade_analysis_summary.csv',
   });
 });

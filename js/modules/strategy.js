@@ -3,7 +3,7 @@ import { formatPercent, valClass, showError } from '../utils.js';
 
 let holdingData = null;
 let tradeData = null;
-const DEFAULT_STRATEGY_DATA_BASE_URL = 'data/';
+const DEFAULT_STRATEGY_DATA_BASE_URL = './';
 
 function parseCSV(text) {
   // Strip BOM if present
@@ -55,25 +55,9 @@ async function loadStrategyDataFromUrls(urls) {
 
 export async function loadStrategyData() {
   const configuredBaseUrl = APP_CONFIG.strategyDataBaseUrl;
-  const candidateUrls = [
-    getStrategyDataUrls(configuredBaseUrl),
-    getStrategyDataUrls(),
-  ].filter((urls, index, all) => {
-    return index === all.findIndex(item => item.holding === urls.holding && item.trade === urls.trade);
-  });
 
   try {
-    for (const urls of candidateUrls) {
-      try {
-        await loadStrategyDataFromUrls(urls);
-        return;
-      } catch {
-        // Try the next configured location before failing the module.
-      }
-    }
-
-    holdingData = [];
-    tradeData = [];
+    await loadStrategyDataFromUrls(getStrategyDataUrls(configuredBaseUrl));
   } catch {
     holdingData = [];
     tradeData = [];
