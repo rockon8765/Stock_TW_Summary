@@ -33,6 +33,37 @@
   border-color: #3b82f6;
 }
 
+/* Metric cards in profile section */
+.metric-cards {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #334155;
+}
+
+.metric-card {
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: #0f172a;
+  border: 1px solid #334155;
+}
+
+.metric-label {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.metric-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
 /* Data tables */
 .data-table {
   width: 100%;
@@ -74,7 +105,7 @@
 .val-down { color: #22c55e; }
 .val-neutral { color: #94a3b8; }
 
-/* Info card */
+/* Info card (institutional summary) */
 .info-card {
   background: #0f172a;
   border: 1px solid #334155;
@@ -110,6 +141,11 @@
   color: #e2e8f0;
 }
 
+/* Text utility */
+.text-muted {
+  color: #94a3b8;
+}
+
 /* Scrollbar for dark theme */
 ::-webkit-scrollbar {
   width: 6px;
@@ -123,4 +159,17 @@
 ::-webkit-scrollbar-thumb {
   background: #475569;
   border-radius: 3px;
+}
+
+/* K-line collapse toggle */
+#kline-toggle {
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: inherit;
+}
+
+#kline-toggle:hover {
+  background: rgba(51, 65, 85, 0.3);
+  border-radius: 0.75rem 0.75rem 0 0;
 }

@@ -3,12 +3,16 @@ import {
   fetchCompanyProfile,
   fetchMonthSales,
   fetchQuarterlyIncome,
+  fetchQuarterlyBS,
+  fetchDividendPolicy,
   fetchForeignTrading,
   fetchTrustTrading,
   fetchBrokerTrading,
   fetchShareholderStructure,
 } from "./api.js";
 import { renderProfile } from "./modules/profile.js";
+import { renderValuation } from "./modules/valuation.js";
+import { renderDividend } from "./modules/dividend.js";
 import { renderKline } from "./charts/kline.js";
 import { renderRevenue } from "./modules/revenue.js";
 import { renderIncome } from "./modules/income.js";
@@ -25,26 +29,25 @@ const welcomeMsg = document.getElementById("welcome-msg");
 const dataContainer = document.getElementById("data-container");
 
 function resetSections() {
-  // Restore skeleton loading for all sections
   const skeletons = {
     "profile-content":
       '<div class="skeleton h-6 w-48 mb-3"></div><div class="skeleton h-4 w-96"></div>',
-    "kline-chart":
-      '<div class="section-loading h-full flex items-center justify-center"><div class="skeleton h-full w-full rounded-lg"></div></div>',
-    "revenue-chart-container":
-      '<div class="section-loading h-full"><div class="skeleton h-full w-full rounded-lg"></div></div>',
+    "valuation-table-container":
+      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
+    "dividend-table-container":
+      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
     "revenue-table-container":
       '<div class="section-loading"><div class="skeleton h-40 w-full rounded-lg"></div></div>',
     "income-table-container":
       '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
-    "institutional-chart-container":
-      '<div class="section-loading h-full"><div class="skeleton h-full w-full rounded-lg"></div></div>',
+    "institutional-table-container":
+      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
     "institutional-cards":
-      '<div class="section-loading"><div class="skeleton h-28 w-full rounded-lg"></div></div><div class="section-loading"><div class="skeleton h-28 w-full rounded-lg"></div></div><div class="section-loading"><div class="skeleton h-28 w-full rounded-lg"></div></div>',
-    "shareholders-chart-container":
-      '<div class="section-loading h-full"><div class="skeleton h-full w-full rounded-lg"></div></div>',
-    "shareholders-trend-container":
-      '<div class="section-loading h-full"><div class="skeleton h-full w-full rounded-lg"></div></div>',
+      '<div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div><div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div><div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>',
+    "shareholders-table-container":
+      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
+    "kline-chart":
+      '<div class="section-loading h-full flex items-center justify-center"><div class="skeleton h-full w-full rounded-lg"></div></div>',
     "strategy-holding-container":
       '<div class="section-loading"><div class="skeleton h-48 w-full rounded-lg"></div></div>',
     "strategy-trade-container":
@@ -59,7 +62,6 @@ function resetSections() {
 async function search(ticker) {
   if (!ticker) return;
 
-  // Cancel previous request
   if (abortController) abortController.abort();
   abortController = new AbortController();
   const { signal } = abortController;
@@ -73,6 +75,8 @@ async function search(ticker) {
     { key: "profile", fn: () => fetchCompanyProfile(ticker, signal) },
     { key: "sales", fn: () => fetchMonthSales(ticker, signal) },
     { key: "income", fn: () => fetchQuarterlyIncome(ticker, signal) },
+    { key: "bs", fn: () => fetchQuarterlyBS(ticker, signal) },
+    { key: "dividend", fn: () => fetchDividendPolicy(ticker, signal) },
     { key: "foreign", fn: () => fetchForeignTrading(ticker, signal) },
     { key: "trust", fn: () => fetchTrustTrading(ticker, signal) },
     { key: "broker", fn: () => fetchBrokerTrading(ticker, signal) },
@@ -90,40 +94,74 @@ async function search(ticker) {
 
   if (signal.aborted) return;
 
-  // Render each module independently
+  // Section 1: Profile + valuation cards
   try {
-    if (data.profile) renderProfile(data.profile.data, data.quotes?.data);
+    if (data.profile)
+      renderProfile(
+        data.profile.data,
+        data.quotes?.data,
+        data.bs?.data,
+        data.income?.data,
+      );
     else
-      showError(document.getElementById("profile-content"), "公司資料載入失敗");
+      showError(
+        document.getElementById("profile-content"),
+        "公司資料載入失敗",
+      );
   } catch {
-    showError(document.getElementById("profile-content"), "公司資料渲染錯誤");
-  }
-
-  try {
-    if (data.quotes) renderKline(data.quotes.data);
-    else showError(document.getElementById("kline-chart"), "K 線資料載入失敗");
-  } catch (e) {
-    console.error("K線渲染錯誤:", e);
     showError(
-      document.getElementById("kline-chart"),
-      "K 線渲染錯誤: " + e.message,
+      document.getElementById("profile-content"),
+      "公司資料渲染錯誤",
     );
   }
 
+  // Section 2a: Valuation trend table
+  try {
+    if (data.income)
+      renderValuation(data.income.data, data.bs?.data);
+    else
+      showError(
+        document.getElementById("valuation-table-container"),
+        "估值趨勢資料載入失敗",
+      );
+  } catch {
+    showError(
+      document.getElementById("valuation-table-container"),
+      "估值趨勢渲染錯誤",
+    );
+  }
+
+  // Section 2b: Dividend history
+  try {
+    if (data.dividend) renderDividend(data.dividend.data);
+    else
+      showError(
+        document.getElementById("dividend-table-container"),
+        "股利資料載入失敗",
+      );
+  } catch {
+    showError(
+      document.getElementById("dividend-table-container"),
+      "股利渲染錯誤",
+    );
+  }
+
+  // Section 3a: Revenue
   try {
     if (data.sales) renderRevenue(data.sales.data);
     else
       showError(
-        document.getElementById("revenue-chart-container"),
+        document.getElementById("revenue-table-container"),
         "營收資料載入失敗",
       );
   } catch {
     showError(
-      document.getElementById("revenue-chart-container"),
+      document.getElementById("revenue-table-container"),
       "營收渲染錯誤",
     );
   }
 
+  // Section 3b: Income
   try {
     if (data.income) renderIncome(data.income.data);
     else
@@ -138,6 +176,7 @@ async function search(ticker) {
     );
   }
 
+  // Section 4a: Institutional
   try {
     if (data.foreign || data.trust || data.broker) {
       renderInstitutional(
@@ -147,32 +186,44 @@ async function search(ticker) {
       );
     } else {
       showError(
-        document.getElementById("institutional-chart-container"),
+        document.getElementById("institutional-table-container"),
         "法人資料載入失敗",
       );
     }
   } catch {
     showError(
-      document.getElementById("institutional-chart-container"),
+      document.getElementById("institutional-table-container"),
       "法人渲染錯誤",
     );
   }
 
+  // Section 4b: Shareholders
   try {
     if (data.shareholders) renderShareholders(data.shareholders.data);
     else
       showError(
-        document.getElementById("shareholders-chart-container"),
+        document.getElementById("shareholders-table-container"),
         "股權資料載入失敗",
       );
   } catch {
     showError(
-      document.getElementById("shareholders-chart-container"),
+      document.getElementById("shareholders-table-container"),
       "股權渲染錯誤",
     );
   }
 
-  // Strategy performance (from local CSV)
+  // Section 5: K-line (rendered but collapsed)
+  try {
+    if (data.quotes) renderKline(data.quotes.data);
+    else showError(document.getElementById("kline-chart"), "K 線資料載入失敗");
+  } catch (e) {
+    showError(
+      document.getElementById("kline-chart"),
+      "K 線渲染錯誤: " + e.message,
+    );
+  }
+
+  // Section 6: Strategy performance
   try {
     renderStrategy(ticker);
   } catch {
@@ -181,6 +232,22 @@ async function search(ticker) {
       "策略資料渲染錯誤",
     );
   }
+}
+
+// K-line collapse toggle
+const klineToggle = document.getElementById("kline-toggle");
+const klineCollapse = document.getElementById("kline-collapse");
+const klineIcon = document.getElementById("kline-toggle-icon");
+
+if (klineToggle) {
+  klineToggle.addEventListener("click", () => {
+    const isHidden = klineCollapse.classList.toggle("hidden");
+    klineIcon.textContent = isHidden ? "▶ 展開" : "▼ 收合";
+    // Trigger chart resize when expanding
+    if (!isHidden) {
+      window.dispatchEvent(new Event("resize"));
+    }
+  });
 }
 
 // Debounce

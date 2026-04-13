@@ -6,6 +6,7 @@ let allData = [];
 export function renderKline(data) {
   const container = document.getElementById('kline-chart');
   container.innerHTML = '';
+  const getChartHeight = () => container.clientHeight || 360;
 
   // Sort by date ascending
   allData = [...data].sort((a, b) => a['日期'].localeCompare(b['日期']));
@@ -27,7 +28,7 @@ export function renderKline(data) {
       timeVisible: false,
     },
     width: container.clientWidth,
-    height: 420,
+    height: getChartHeight(),
   });
 
   // Candlestick series (v4 compatible: try new API first, fallback to legacy)
@@ -64,7 +65,7 @@ export function renderKline(data) {
 
   // Responsive
   const ro = new ResizeObserver(() => {
-    chart.resize(container.clientWidth, 420);
+    chart.resize(container.clientWidth, getChartHeight());
   });
   ro.observe(container);
 }
