@@ -2,6 +2,7 @@ import { formatPercent, valClass, showError } from '../utils.js';
 
 let holdingData = null;
 let tradeData = null;
+const DEFAULT_STRATEGY_DATA_BASE_URL = 'data/';
 
 function parseCSV(text) {
   // Strip BOM if present
@@ -20,18 +21,58 @@ function parseCSV(text) {
   });
 }
 
+function normalizeBaseUrl(baseUrl = DEFAULT_STRATEGY_DATA_BASE_URL) {
+  return baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+}
+
+export function getStrategyDataUrls(baseUrl = DEFAULT_STRATEGY_DATA_BASE_URL) {
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  return {
+    holding: `${normalizedBaseUrl}strategy_ticker_holding_summary.csv`,
+    trade: `${normalizedBaseUrl}strategy_ticker_trade_analysis_summary.csv`,
+  };
+}
+
+async function loadStrategyDataFromUrls(urls) {
+  const [holdingRes, tradeRes] = await Promise.all([
+    fetch(urls.holding),
+    fetch(urls.trade),
+  ]);
+
+  if (!holdingRes.ok || !tradeRes.ok) {
+    throw new Error('strategy data fetch failed');
+  }
+
+  const [holdingText, tradeText] = await Promise.all([
+    holdingRes.text(),
+    tradeRes.text(),
+  ]);
+
+  holdingData = parseCSV(holdingText);
+  tradeData = parseCSV(tradeText);
+}
+
 export async function loadStrategyData() {
+  const configuredBaseUrl = globalThis.STOCK_ONE_PAGE_CONFIG?.strategyDataBaseUrl;
+  const candidateUrls = [
+    getStrategyDataUrls(configuredBaseUrl),
+    getStrategyDataUrls(),
+  ].filter((urls, index, all) => {
+    return index === all.findIndex(item => item.holding === urls.holding && item.trade === urls.trade);
+  });
+
   try {
-    const [holdingRes, tradeRes] = await Promise.all([
-      fetch('data/strategy_ticker_holding_summary.csv'),
-      fetch('data/strategy_ticker_trade_analysis_summary.csv'),
-    ]);
-    const [holdingText, tradeText] = await Promise.all([
-      holdingRes.text(),
-      tradeRes.text(),
-    ]);
-    holdingData = parseCSV(holdingText);
-    tradeData = parseCSV(tradeText);
+    for (const urls of candidateUrls) {
+      try {
+        await loadStrategyDataFromUrls(urls);
+        return;
+      } catch {
+        // Try the next configured location before failing the module.
+      }
+    }
+
+    holdingData = [];
+    tradeData = [];
   } catch {
     holdingData = [];
     tradeData = [];

@@ -54,6 +54,8 @@ python -m http.server 8000
 npx serve .
 ```
 
+策略績效摘要檔預設會從 `window.STOCK_ONE_PAGE_CONFIG.strategyDataBaseUrl` 指定的位置讀取；目前 `index.html` 預設為 `../`，也就是讀取上一層目錄的 `strategy_ticker_holding_summary.csv` 與 `strategy_ticker_trade_analysis_summary.csv`。若部署到 GitHub Pages 或其他不同路徑，請把這個設定改成對應的公開 URL 或目錄。
+
 ## License
 
 MIT
