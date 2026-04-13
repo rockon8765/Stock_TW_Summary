@@ -1,3 +1,4 @@
+import { APP_CONFIG } from '../config.js';
 import { formatPercent, valClass, showError } from '../utils.js';
 
 let holdingData = null;
@@ -53,7 +54,7 @@ async function loadStrategyDataFromUrls(urls) {
 }
 
 export async function loadStrategyData() {
-  const configuredBaseUrl = globalThis.STOCK_ONE_PAGE_CONFIG?.strategyDataBaseUrl;
+  const configuredBaseUrl = APP_CONFIG.strategyDataBaseUrl;
   const candidateUrls = [
     getStrategyDataUrls(configuredBaseUrl),
     getStrategyDataUrls(),
