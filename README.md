@@ -19,7 +19,7 @@ GitHub Pages: [https://rockon8765.github.io/Stock_TW_Summary/](https://rockon876
 
 - 純前端靜態網頁，無需後端
 - Tailwind CSS — 深色主題 UI
-- [Lightweight Charts v4](https://github.com/nicehash/lightweight-charts) — K 線圖
+- [Lightweight Charts v4](https://github.com/tradingview/lightweight-charts) — K 線圖
 - [Chart.js](https://www.chartjs.org/) — 營收、法人、股權圖表
 - 資料來源：CMWebAPI（`data.dottdot.com`）
 
