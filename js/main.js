@@ -9,6 +9,11 @@ import {
   fetchTrustTrading,
   fetchBrokerTrading,
   fetchShareholderStructure,
+  fetchQuarterlyCashflow,
+  fetchDailyStatistics,
+  fetchInsiderStructure,
+  fetchAnnualIncome,
+  fetchAnnualBS,
 } from "./api.js";
 import { renderProfile } from "./modules/profile.js";
 import { renderValuation } from "./modules/valuation.js";
@@ -19,6 +24,7 @@ import { renderIncome } from "./modules/income.js";
 import { renderInstitutional } from "./modules/institutional.js";
 import { renderShareholders } from "./modules/shareholders.js";
 import { loadStrategyData, renderStrategy } from "./modules/strategy.js";
+import { aggregateDividendsToAnnual } from "./lib/dividend_aggregator.js";
 import { showError } from "./utils.js";
 
 let abortController = null;
@@ -84,6 +90,12 @@ async function search(ticker) {
       key: "shareholders",
       fn: () => fetchShareholderStructure(ticker, signal),
     },
+    // Tier 1 + Tier 2 新增資料源
+    { key: "cashflow", fn: () => fetchQuarterlyCashflow(ticker, signal) },
+    { key: "stats", fn: () => fetchDailyStatistics(ticker, signal) },
+    { key: "insider", fn: () => fetchInsiderStructure(ticker, signal) },
+    { key: "annualIs", fn: () => fetchAnnualIncome(ticker, signal) },
+    { key: "annualBs", fn: () => fetchAnnualBS(ticker, signal) },
   ];
 
   const results = await Promise.allSettled(tasks.map((t) => t.fn()));
@@ -93,6 +105,9 @@ async function search(ticker) {
   });
 
   if (signal.aborted) return;
+
+  // 季→年股利聚合（供 dividend / cashflow / financial_ratios / long_term_trend 共用）
+  const annualDiv = aggregateDividendsToAnnual(data.dividend?.data);
 
   // Section 1: Profile + valuation cards
   try {
@@ -104,21 +119,14 @@ async function search(ticker) {
         data.income?.data,
       );
     else
-      showError(
-        document.getElementById("profile-content"),
-        "公司資料載入失敗",
-      );
+      showError(document.getElementById("profile-content"), "公司資料載入失敗");
   } catch {
-    showError(
-      document.getElementById("profile-content"),
-      "公司資料渲染錯誤",
-    );
+    showError(document.getElementById("profile-content"), "公司資料渲染錯誤");
   }
 
   // Section 2a: Valuation trend table
   try {
-    if (data.income)
-      renderValuation(data.income.data, data.bs?.data);
+    if (data.income) renderValuation(data.income.data, data.bs?.data);
     else
       showError(
         document.getElementById("valuation-table-container"),
@@ -131,14 +139,20 @@ async function search(ticker) {
     );
   }
 
-  // Section 2b: Dividend history
+  // Section 2b: Dividend history（年度視圖，修正既有 bug）
   try {
-    if (data.dividend) renderDividend(data.dividend.data);
-    else
+    if (annualDiv.length > 0) {
+      renderDividend({
+        annualDiv,
+        quotes: data.quotes?.data,
+        annualIs: data.annualIs?.data,
+      });
+    } else {
       showError(
         document.getElementById("dividend-table-container"),
         "股利資料載入失敗",
       );
+    }
   } catch {
     showError(
       document.getElementById("dividend-table-container"),
