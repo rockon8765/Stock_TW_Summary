@@ -203,3 +203,17 @@ export function fetchQuarterlyBS(ticker, signal) {
     signal,
   );
 }
+
+// === 全域 Scorecard（規則警示 + 策略買入分數）===
+// 由 ScoreCard_V2_New/export_scorecard_to_web.py 產生。
+// 檔案不存在（尚未跑 export）時回傳 null，由 UI graceful degradation。
+export async function fetchScorecard(signal) {
+  try {
+    const res = await fetch("scorecard_web.json", { signal });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    if (err.name === "AbortError") throw err;
+    return null;
+  }
+}

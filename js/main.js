@@ -14,6 +14,7 @@ import {
   fetchInsiderStructure,
   fetchAnnualIncome,
   fetchAnnualBS,
+  fetchScorecard,
 } from "./api.js";
 import { renderProfile } from "./modules/profile.js";
 import { renderValuation } from "./modules/valuation.js";
@@ -29,10 +30,16 @@ import { renderFinancialRatios } from "./modules/financial_ratios.js";
 import { renderRiskTechnical } from "./modules/risk_technical.js";
 import { renderInsiderGovernance } from "./modules/insider_governance.js";
 import { renderLongTermTrend } from "./modules/long_term_trend.js";
+import { renderRuleAlerts } from "./modules/rule_alerts.js";
+import { renderStrategyScores } from "./modules/strategy_scores.js";
 import { aggregateDividendsToAnnual } from "./lib/dividend_aggregator.js";
 import { showError } from "./utils.js";
 
 let abortController = null;
+
+// Scorecard 是全域 snapshot（非 per-ticker）：首次查詢連同載入、後續切 ticker 走快取。
+let scorecardData = null;
+let scorecardLoadedOnce = false;
 
 const tickerInput = document.getElementById("ticker-input");
 const searchBtn = document.getElementById("search-btn");
@@ -75,6 +82,10 @@ function resetSections() {
       '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
     "risk-tech-container":
       '<div class="section-loading"><div class="skeleton h-48 w-full rounded-lg"></div></div>',
+    "rule-alerts-container":
+      '<div class="section-loading"><div class="skeleton h-12 w-full rounded-lg"></div></div>',
+    "strategy-scores-container":
+      '<div class="section-loading"><div class="skeleton h-48 w-full rounded-lg"></div></div>',
   };
   for (const [id, html] of Object.entries(skeletons)) {
     const el = document.getElementById(id);
@@ -115,6 +126,11 @@ async function search(ticker) {
     { key: "annualBs", fn: () => fetchAnnualBS(ticker, signal) },
   ];
 
+  // 首次查詢含 scorecard（全域 snapshot、非 per-ticker）
+  if (!scorecardLoadedOnce) {
+    tasks.push({ key: "scorecard", fn: () => fetchScorecard(signal) });
+  }
+
   const results = await Promise.allSettled(tasks.map((t) => t.fn()));
   const data = {};
   results.forEach((r, i) => {
@@ -122,6 +138,12 @@ async function search(ticker) {
   });
 
   if (signal.aborted) return;
+
+  // 首次將 scorecard 放入快取
+  if (!scorecardLoadedOnce) {
+    scorecardData = data.scorecard; // null 或整包 JSON
+    scorecardLoadedOnce = true;
+  }
 
   // 季→年股利聚合（供 dividend / cashflow / financial_ratios / long_term_trend 共用）
   const annualDiv = aggregateDividendsToAnnual(data.dividend?.data);
@@ -139,6 +161,16 @@ async function search(ticker) {
       showError(document.getElementById("profile-content"), "公司資料載入失敗");
   } catch {
     showError(document.getElementById("profile-content"), "公司資料渲染錯誤");
+  }
+
+  // Section 1.5 (NEW): 規則警示 chips（Profile 區塊內、metric cards 下方）
+  try {
+    renderRuleAlerts(scorecardData, ticker);
+  } catch {
+    showError(
+      document.getElementById("rule-alerts-container"),
+      "規則警示渲染錯誤",
+    );
   }
 
   // Section 2a: Valuation trend table
@@ -251,6 +283,16 @@ async function search(ticker) {
     showError(
       document.getElementById("kline-chart"),
       "K 線渲染錯誤: " + e.message,
+    );
+  }
+
+  // Section 5.5 (NEW): 策略買入分數表（K 線之後、估值之前）
+  try {
+    renderStrategyScores(scorecardData, ticker);
+  } catch {
+    showError(
+      document.getElementById("strategy-scores-container"),
+      "策略分數渲染錯誤",
     );
   }
 
