@@ -81,6 +81,19 @@
         </section>
       </div>
 
+      <!-- Section 2.5 (NEW): 財務比率儀表板（6 張卡） -->
+      <section id="section-ratios" class="bg-card rounded-xl p-5 border border-slate-700/50">
+        <h2 class="text-lg font-semibold mb-4">財務比率儀表板</h2>
+        <div id="ratios-dashboard-container" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div class="section-loading"><div class="skeleton h-20 w-full rounded-lg"></div></div>
+          <div class="section-loading"><div class="skeleton h-20 w-full rounded-lg"></div></div>
+          <div class="section-loading"><div class="skeleton h-20 w-full rounded-lg"></div></div>
+          <div class="section-loading"><div class="skeleton h-20 w-full rounded-lg"></div></div>
+          <div class="section-loading"><div class="skeleton h-20 w-full rounded-lg"></div></div>
+          <div class="section-loading"><div class="skeleton h-20 w-full rounded-lg"></div></div>
+        </div>
+      </section>
+
       <!-- Section 3: 月營收 | 季度損益 -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section id="section-revenue" class="bg-card rounded-xl p-5 border border-slate-700/50">
@@ -93,6 +106,23 @@
         <section id="section-income" class="bg-card rounded-xl p-5 border border-slate-700/50">
           <h2 class="text-lg font-semibold mb-4">季度損益（近 8 季）</h2>
           <div id="income-table-container" class="overflow-x-auto">
+            <div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Section 3.5 (NEW): 現金流摘要 | 5Y 長期趨勢 -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <section id="section-cashflow" class="bg-card rounded-xl p-5 border border-slate-700/50">
+          <h2 class="text-lg font-semibold mb-4">現金流摘要（近 8 季）</h2>
+          <div id="cashflow-table-container" class="overflow-x-auto">
+            <div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>
+          </div>
+        </section>
+
+        <section id="section-longterm" class="bg-card rounded-xl p-5 border border-slate-700/50">
+          <h2 class="text-lg font-semibold mb-4">5 年長期趨勢</h2>
+          <div id="longterm-trend-container">
             <div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>
           </div>
         </section>
@@ -119,6 +149,22 @@
           </div>
         </section>
       </div>
+
+      <!-- Section 4.5 (NEW): 公司治理（內部人持股 + 設質） -->
+      <section id="section-governance" class="bg-card rounded-xl p-5 border border-slate-700/50">
+        <h2 class="text-lg font-semibold mb-4">公司治理（近 12 月內部人持股與設質）</h2>
+        <div id="governance-table-container" class="overflow-x-auto">
+          <div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>
+        </div>
+      </section>
+
+      <!-- Section 4.8 (NEW): 風險與技術面 -->
+      <section id="section-risk-tech" class="bg-card rounded-xl p-5 border border-slate-700/50">
+        <h2 class="text-lg font-semibold mb-4">風險與技術面</h2>
+        <div id="risk-tech-container">
+          <div class="section-loading"><div class="skeleton h-48 w-full rounded-lg"></div></div>
+        </div>
+      </section>
 
       <!-- Section 5: K 線圖（可折疊，預設收合） -->
       <section id="section-kline" class="bg-card rounded-xl border border-slate-700/50">

@@ -24,6 +24,11 @@ import { renderIncome } from "./modules/income.js";
 import { renderInstitutional } from "./modules/institutional.js";
 import { renderShareholders } from "./modules/shareholders.js";
 import { loadStrategyData, renderStrategy } from "./modules/strategy.js";
+import { renderCashflow } from "./modules/cashflow.js";
+import { renderFinancialRatios } from "./modules/financial_ratios.js";
+import { renderRiskTechnical } from "./modules/risk_technical.js";
+import { renderInsiderGovernance } from "./modules/insider_governance.js";
+import { renderLongTermTrend } from "./modules/long_term_trend.js";
 import { aggregateDividendsToAnnual } from "./lib/dividend_aggregator.js";
 import { showError } from "./utils.js";
 
@@ -57,6 +62,18 @@ function resetSections() {
     "strategy-holding-container":
       '<div class="section-loading"><div class="skeleton h-48 w-full rounded-lg"></div></div>',
     "strategy-trade-container":
+      '<div class="section-loading"><div class="skeleton h-48 w-full rounded-lg"></div></div>',
+    "ratios-dashboard-container":
+      '<div class="section-loading"><div class="skeleton h-20 w-full rounded-lg"></div></div>'.repeat(
+        6,
+      ),
+    "cashflow-table-container":
+      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
+    "longterm-trend-container":
+      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
+    "governance-table-container":
+      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
+    "risk-tech-container":
       '<div class="section-loading"><div class="skeleton h-48 w-full rounded-lg"></div></div>',
   };
   for (const [id, html] of Object.entries(skeletons)) {
@@ -244,6 +261,83 @@ async function search(ticker) {
     showError(
       document.getElementById("strategy-holding-container"),
       "策略資料渲染錯誤",
+    );
+  }
+
+  // === Tier 1 + Tier 2 新增區塊 ===
+
+  // 財務比率儀表板（衍生，不打新 API）
+  try {
+    renderFinancialRatios({
+      incomeQ: data.income?.data,
+      bsQ: data.bs?.data,
+      cfQ: data.cashflow?.data,
+    });
+  } catch {
+    showError(
+      document.getElementById("ratios-dashboard-container"),
+      "財務比率渲染錯誤",
+    );
+  }
+
+  // 現金流摘要
+  try {
+    if (data.cashflow) renderCashflow(data.cashflow.data, annualDiv);
+    else
+      showError(
+        document.getElementById("cashflow-table-container"),
+        "現金流資料載入失敗",
+      );
+  } catch {
+    showError(
+      document.getElementById("cashflow-table-container"),
+      "現金流渲染錯誤",
+    );
+  }
+
+  // 5 年長期趨勢
+  try {
+    if (data.annualIs || data.annualBs)
+      renderLongTermTrend(data.annualIs?.data, data.annualBs?.data, annualDiv);
+    else
+      showError(
+        document.getElementById("longterm-trend-container"),
+        "年度財報載入失敗",
+      );
+  } catch {
+    showError(
+      document.getElementById("longterm-trend-container"),
+      "長期趨勢渲染錯誤",
+    );
+  }
+
+  // 公司治理（內部人持股 + 設質）
+  try {
+    if (data.insider) renderInsiderGovernance(data.insider.data);
+    else
+      showError(
+        document.getElementById("governance-table-container"),
+        "公司治理資料載入失敗",
+      );
+  } catch {
+    showError(
+      document.getElementById("governance-table-container"),
+      "公司治理渲染錯誤",
+    );
+  }
+
+  // 風險與技術面
+  try {
+    if (data.stats) renderRiskTechnical(data.stats.data);
+    else
+      showError(
+        document.getElementById("risk-tech-container"),
+        "技術指標載入失敗",
+      );
+  } catch {
+    showError(
+      document.getElementById("risk-tech-container"),
+      "技術指標渲染錯誤",
     );
   }
 }

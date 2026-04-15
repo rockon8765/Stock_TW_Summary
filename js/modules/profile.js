@@ -85,7 +85,7 @@ export function renderProfile(profileData, quotesData, bsData, incomeData) {
         <div class="text-sm text-muted space-x-4">
           ${fullName ? `<span>${fullName}</span>` : ""}
           ${chairman ? `<span>董事長：${chairman}</span>` : ""}
-          ${capital ? `<span>資本額：${formatNumber(capital / 1e8, 2)} 億</span>` : ""}
+          ${capital ? `<span>資本額：${formatNumber(capital / 1e2, 2)} 億</span>` : ""}
           ${listDate ? `<span>上市：${listDate}</span>` : ""}
         </div>
       </div>
