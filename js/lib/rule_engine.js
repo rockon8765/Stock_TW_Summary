@@ -1,8 +1,9 @@
 /**
- * 前端 Rule Engine — 即時計算 7 條 sell rules
+ * Frontend live alerts engine.
  *
- * 對齊 ScoreCard_V2_New/rule_build.py 的 S10/S11/S12/S13/S17/S20/S22。
- * 全部從 Dottdot API 已 fetch 的資料計算，不依賴 Python pipeline。
+ * 這組規則只服務網頁上的「即時規則警示（Live API）」區塊，
+ * 直接從 Dottdot API 已 fetch 的資料計算，不承諾與 ScoreCard export
+ * 或 Python pipeline 的 snapshot 完全一致。
  *
  * 每條 rule 回傳 boolean（true = triggered / 警示）。
  */
@@ -135,8 +136,7 @@ function checkS17(quotes) {
  * 資料：monthsales 的 `單月合併營收年成長`（百分比）
  * 觸發：最近 2 個月的 單月合併營收年成長 都 < 0
  *
- * 備註：規則名稱寫「季」但 Python 實作 (rule_build.py:363-372) 用月資料。
- * 這裡跟隨 Python 實作。
+ * 備註：規則名稱寫「季」，但這裡仍以近兩個月的月營收 YOY 作為 live alert 的近似條件。
  */
 function checkS20(monthsales) {
   if (!monthsales || monthsales.length < 2) return false;
@@ -153,8 +153,8 @@ function checkS20(monthsales) {
  * 資料：dailyquotes 的 `收盤價`（計算 250MA）+ dailystatistics 的 `Alpha250D`
  * 觸發：收盤價 < 250日均線 AND Alpha250D < -0.10
  *
- * 備註：原 Python 用 `df_與大盤比年報酬率` 欄位；JS 端改用 Alpha250D 做近似
- * （Alpha 衡量扣除市場因素後的超額報酬，負值表示跑輸大盤）。
+ * 備註：Live API 沒有直接提供 ScoreCard pipeline 使用的
+ * `與大盤比年報酬率(%)`，前端改用 Alpha250D 作為即時近似訊號。
  */
 function checkS22(quotes, stats) {
   if (!quotes || quotes.length < 250) return false;

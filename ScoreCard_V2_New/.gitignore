@@ -1,0 +1,83 @@
+# Keep this directory trackable as source/scripts/docs only.
+# Generated datasets, cached results, local editor state, and secrets stay untracked.
+
+# Nested repo metadata / local editor files
+.git/
+embedded_git_backup/
+.vscode/
+.DS_Store
+
+# Python cache / local environments
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.pytest_cache/
+.mypy_cache/
+.pyre/
+.pytype/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+cover/
+
+# Local credentials / machine-specific config
+myKey.json
+*.json
+.env
+.env.*
+
+# Generated raw data / derived artifacts
+CMoneyData/
+CMoneyData_Backup/
+CMoney_Measure/
+Data_Rule/
+Result/
+Ticker_Result/
+reference/Data_Raw/
+reference/Data_Result_ISWRs/
+build/
+dist/
+downloads/
+.eggs/
+*.egg-info/
+*.manifest
+*.spec
+*.npy
+*.so
+*.pt
+*.bin
+*.model
+*.vocab
+
+# Tabular / office exports
+*.feather
+*.csv
+*.xls
+*.xlsx
+*.xlsx*
+*.ppt
+*.pptx
+*.doc
+*.docx
+*.txt
+*.mdb
+*.accdb
+*.vsd
+*.vsdx
+*.mpp
+*.pub
+*.one
+*.onenote
+*.pst
+*.ost

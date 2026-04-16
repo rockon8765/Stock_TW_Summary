@@ -14,7 +14,7 @@ import {
   fetchInsiderStructure,
   fetchAnnualIncome,
   fetchAnnualBS,
-  fetchScorecard,
+  fetchStrategySnapshot,
 } from "./api.js";
 import { renderProfile } from "./modules/profile.js";
 import { renderValuation } from "./modules/valuation.js";
@@ -38,9 +38,9 @@ import { showError } from "./utils.js";
 
 let abortController = null;
 
-// Scorecard 是全域 snapshot（非 per-ticker）：首次查詢連同載入、後續切 ticker 走快取。
-let scorecardData = null;
-let scorecardLoadedOnce = false;
+// 策略分數是全域 snapshot（非 per-ticker）：首次查詢連同載入、後續切 ticker 走快取。
+let strategySnapshotData = null;
+let strategySnapshotLoadedOnce = false;
 
 const tickerInput = document.getElementById("ticker-input");
 const searchBtn = document.getElementById("search-btn");
@@ -127,9 +127,9 @@ async function search(ticker) {
     { key: "annualBs", fn: () => fetchAnnualBS(ticker, signal) },
   ];
 
-  // 首次查詢含 scorecard（全域 snapshot、非 per-ticker）
-  if (!scorecardLoadedOnce) {
-    tasks.push({ key: "scorecard", fn: () => fetchScorecard(signal) });
+  // 首次查詢含策略分數 snapshot（全域 snapshot、非 per-ticker）
+  if (!strategySnapshotLoadedOnce) {
+    tasks.push({ key: "strategySnapshot", fn: () => fetchStrategySnapshot(signal) });
   }
 
   const results = await Promise.allSettled(tasks.map((t) => t.fn()));
@@ -140,10 +140,10 @@ async function search(ticker) {
 
   if (signal.aborted) return;
 
-  // 首次將 scorecard 放入快取
-  if (!scorecardLoadedOnce) {
-    scorecardData = data.scorecard; // null 或整包 JSON
-    scorecardLoadedOnce = true;
+  // 首次將策略分數 snapshot 放入快取
+  if (!strategySnapshotLoadedOnce) {
+    strategySnapshotData = data.strategySnapshot; // null 或整包 JSON
+    strategySnapshotLoadedOnce = true;
   }
 
   // 季→年股利聚合（供 dividend / cashflow / financial_ratios / long_term_trend 共用）
@@ -164,7 +164,7 @@ async function search(ticker) {
     showError(document.getElementById("profile-content"), "公司資料渲染錯誤");
   }
 
-  // Section 1.5: 規則警示 chips（即時計算，不依賴 Python pipeline）
+  // Section 1.5: 即時規則警示（只讀 Live API，不依賴策略分數 snapshot）
   try {
     const ruleResult = computeRuleAlerts({
       monthsales: data.sales?.data,
@@ -295,7 +295,7 @@ async function search(ticker) {
 
   // Section 5.5 (NEW): 策略買入分數表（K 線之後、估值之前）
   try {
-    renderStrategyScores(scorecardData, ticker);
+    renderStrategyScores(strategySnapshotData, ticker);
   } catch {
     showError(
       document.getElementById("strategy-scores-container"),

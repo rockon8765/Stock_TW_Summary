@@ -5,24 +5,24 @@ let currentSort = { key: "score", dir: "desc" };
 /**
  * 渲染策略買入分數表（K 線之後、估值之前）。
  *
- * @param {{ strategies: Array, tickers: Object, as_of: string }|null} scorecard
+ * @param {{ strategies: Array, tickers: Object, as_of: string }|null} strategySnapshot
  * @param {string} ticker
  */
-export function renderStrategyScores(scorecard, ticker) {
+export function renderStrategyScores(strategySnapshot, ticker) {
   const el = document.getElementById("strategy-scores-container");
   if (!el) return;
 
-  if (!scorecard) {
+  if (!strategySnapshot) {
     el.innerHTML = `
       <div class="section-error">
-        策略分數資料未就緒（請先跑 <code>ScoreCard_V2_New/export_scorecard_to_web.py</code>）
+        策略分數快照未就緒（repo 根目錄缺少 <code>scorecard_web.json</code>）
       </div>`;
     return;
   }
 
-  const tickerData = scorecard.tickers?.[String(ticker)];
+  const tickerData = strategySnapshot.tickers?.[String(ticker)];
   const scoresMap = tickerData?.strategy_scores || {};
-  const strategiesMeta = scorecard.strategies || [];
+  const strategiesMeta = strategySnapshot.strategies || [];
 
   if (Object.keys(scoresMap).length === 0) {
     el.innerHTML = `<div class="section-error">此股未被任何策略評分</div>`;
@@ -42,7 +42,7 @@ export function renderStrategyScores(scorecard, ticker) {
   });
 
   sortRows(rows, currentSort);
-  renderTable(el, rows, scorecard.as_of);
+  renderTable(el, rows, strategySnapshot.as_of);
 
   // Sort handler — 事件委派綁在 container 上，renderTable 重繪 DOM 後仍有效
   el.onclick = (event) => {
@@ -58,7 +58,7 @@ export function renderStrategyScores(scorecard, ticker) {
     }
 
     sortRows(rows, currentSort);
-    renderTable(el, rows, scorecard.as_of);
+    renderTable(el, rows, strategySnapshot.as_of);
   };
 }
 

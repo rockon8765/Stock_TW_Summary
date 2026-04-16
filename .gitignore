@@ -2,6 +2,3 @@
 .DS_Store
 node_modules/
 .claude/
-
-# Scorecard web export（由 ScoreCard_V2_New/export_scorecard_to_web.py 產生，每日變動不 commit）
-scorecard_web.json
