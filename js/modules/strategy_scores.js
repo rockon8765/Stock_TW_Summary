@@ -91,14 +91,12 @@ function renderTable(el, rows, asOf) {
           <tr>
             <th data-sort-key="name" class="cursor-pointer">策略${sortIndicator("name", curr)}</th>
             <th data-sort-key="score" class="cursor-pointer">分數${sortIndicator("score", curr)}</th>
-            <th>進度</th>
             <th data-sort-key="latest_date" class="cursor-pointer">資料新鮮度${sortIndicator("latest_date", curr)}</th>
           </tr>
         </thead>
         <tbody>
           ${rows
             .map((r) => {
-              const pct = Math.max(0, Math.min(1, r.score)) * 100;
               const staleClass = r.is_stale
                 ? "strategy-score-row stale"
                 : "strategy-score-row";
@@ -108,12 +106,7 @@ function renderTable(el, rows, asOf) {
               return `
                 <tr class="${staleClass}">
                   <td class="mono">${r.name}</td>
-                  <td>${formatNumber(r.score, 4)}</td>
-                  <td>
-                    <div class="strategy-score-bar">
-                      <div class="strategy-score-bar-fill" style="width:${pct}%"></div>
-                    </div>
-                  </td>
+                  <td>${Math.round(r.score * 100)}</td>
                   <td>${freshness}</td>
                 </tr>`;
             })
