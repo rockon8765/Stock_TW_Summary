@@ -2,7 +2,7 @@
  * 規則警示 chip — 即時計算版
  *
  * 資料來源：直接從已 fetch 的 Dottdot API 資料計算 7 條 sell rules，
- * 不依賴 Python pipeline / scorecard_web.json。任何有 API 資料的股票都能顯示。
+ * 不依賴 strategy snapshot / scorecard_web.json。任何有 API 資料的股票都能顯示。
  */
 
 /**
@@ -18,7 +18,7 @@ export function renderRuleAlerts(ruleResult) {
   if (!ruleResult || !Array.isArray(ruleResult.rules)) {
     el.innerHTML = `
       <div class="rule-alerts rule-alerts-empty">
-        <span class="muted">規則警示資料不足（API 資料量不夠計算）</span>
+        <span class="muted">即時規則警示資料不足（Live API 資料量不夠計算）</span>
       </div>`;
     return;
   }
@@ -43,7 +43,7 @@ export function renderRuleAlerts(ruleResult) {
   el.innerHTML = `
     <div class="rule-alerts">
       <div class="rule-alerts-header">
-        <span class="rule-alerts-title">規則警示</span>
+        <span class="rule-alerts-title">即時規則警示（Live API）</span>
         <span class="rule-alerts-summary">
           警示 <strong class="${countClass}">${alertCount}/${totalRules}</strong>
         </span>

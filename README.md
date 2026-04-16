@@ -9,7 +9,9 @@ GitHub Pages: [https://rockon8765.github.io/Stock_TW_Summary/](https://rockon876
 ## 功能
 
 - **公司概要** — 基本資訊一覽
+- **即時規則警示（Live API）** — 以前端即時計算的 7 條規則快速提示風險訊號
 - **K 線圖** — 支援 3M / 6M / 1Y / 3Y / 5Y 區間切換（Lightweight Charts v4）
+- **策略買入分數** — 由 `scorecard_web.json` 提供的策略分數快照
 - **月營收** — 近 12 個月營收圖表與數據表
 - **季度損益** — 近 8 季損益摘要
 - **三大法人買賣超** — 近 30 日外資、投信、自營商買賣超走勢
@@ -54,7 +56,11 @@ python -m http.server 8000
 npx serve .
 ```
 
+GitHub Pages 會在 `main` 更新後透過 `.github/workflows/deploy-pages.yml` 自動部署，只上傳網站需要的靜態檔案（`index.html`、`css/`、`js/`、`scorecard_web.json` 與策略摘要 CSV）。
+
 策略績效摘要檔預設會從 `js/config.js` 的 `APP_CONFIG.strategyDataBaseUrl` 指定位置讀取；目前預設為 `./`，也就是直接讀取 repo 根目錄的 `strategy_ticker_holding_summary.csv` 與 `strategy_ticker_trade_analysis_summary.csv`。更新資料時，請先重新產生 summary，再同步到 `StockOnePage` repo 根目錄後部署。
+
+策略買入分數區塊依賴 repo 根目錄的 `scorecard_web.json`。這個檔案是靜態部署資產，更新 ScoreCard / 策略矩陣資料後，請先執行 `ScoreCard_V2_New/export_scorecard_to_web.py` 重新產生，再把新的 `scorecard_web.json` 一起提交與部署。
 
 ## License
 
