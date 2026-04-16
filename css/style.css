@@ -33,6 +33,37 @@
   border-color: #3b82f6;
 }
 
+/* Metric cards in profile section */
+.metric-cards {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #334155;
+}
+
+.metric-card {
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: #0f172a;
+  border: 1px solid #334155;
+}
+
+.metric-label {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.metric-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
 /* Data tables */
 .data-table {
   width: 100%;
@@ -74,7 +105,7 @@
 .val-down { color: #22c55e; }
 .val-neutral { color: #94a3b8; }
 
-/* Info card */
+/* Info card (institutional summary) */
 .info-card {
   background: #0f172a;
   border: 1px solid #334155;
@@ -110,6 +141,11 @@
   color: #e2e8f0;
 }
 
+/* Text utility */
+.text-muted {
+  color: #94a3b8;
+}
+
 /* Scrollbar for dark theme */
 ::-webkit-scrollbar {
   width: 6px;
@@ -123,4 +159,147 @@
 ::-webkit-scrollbar-thumb {
   background: #475569;
   border-radius: 3px;
+}
+
+/* K-line collapse toggle */
+#kline-toggle {
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: inherit;
+}
+
+#kline-toggle:hover {
+  background: rgba(51, 65, 85, 0.3);
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+/* === Rule alerts (ScoreCard 規則警示) === */
+.rule-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rule-alerts-empty {
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.rule-alerts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.rule-alerts-title {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.rule-alerts-summary {
+  color: #cbd5e1;
+}
+
+.rule-cat-badge {
+  display: inline-block;
+  margin-left: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.rule-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: help;
+  transition: transform 0.12s;
+  font-feature-settings: "tnum";
+}
+
+.chip:hover {
+  transform: translateY(-1px);
+}
+
+.chip-off {
+  background: rgba(71, 85, 105, 0.3);
+  color: #94a3b8;
+  border: 1px solid rgba(71, 85, 105, 0.5);
+}
+
+.chip-triggered {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.val-warn {
+  color: #facc15;
+}
+
+/* === Strategy scores === */
+.strategy-scores-header {
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.strategy-scores-table th.cursor-pointer {
+  cursor: pointer;
+  user-select: none;
+}
+
+.strategy-scores-table th.cursor-pointer:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.strategy-score-row td {
+  vertical-align: middle;
+}
+
+.strategy-score-row.stale {
+  opacity: 0.6;
+  background: rgba(250, 204, 21, 0.04);
+}
+
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8125rem;
+}
+
+.fresh-badge,
+.stale-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+}
+
+.fresh-badge {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.stale-badge {
+  background: rgba(250, 204, 21, 0.15);
+  color: #fde047;
+  border: 1px solid rgba(250, 204, 21, 0.4);
 }

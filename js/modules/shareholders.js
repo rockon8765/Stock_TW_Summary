@@ -1,126 +1,62 @@
-import { formatPercent } from '../utils.js';
-
-let doughnutChart = null;
-let trendChart = null;
+import { formatPercent, valClass, signStr, shortDate } from "../utils.js";
 
 export function renderShareholders(data) {
+  const container = document.getElementById("shareholders-table-container");
+  if (!container) return;
+
   if (!data || !data.length) {
-    document.getElementById('shareholders-chart-container').innerHTML =
-      '<div class="section-error">無股權分散資料</div>';
+    container.innerHTML = '<div class="section-error">無股權分散資料</div>';
     return;
   }
 
-  // Sort ascending by date
-  const sorted = [...data].sort((a, b) => String(a['日期']).localeCompare(String(b['日期'])));
-  const latest = sorted[sorted.length - 1];
+  // Sort descending by date (newest first)
+  const sorted = [...data].sort((a, b) =>
+    String(b["日期"]).localeCompare(String(a["日期"])),
+  );
 
-  renderDoughnut(latest);
-  renderTrend(sorted);
-}
+  container.innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>1000張以上</th>
+          <th>400張以上</th>
+          <th>100~400張</th>
+          <th>100張以下</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${sorted
+          .map((d, i) => {
+            const big1000 = d["1000張以上佔集保比率"];
+            const above400 = d["400張以上佔集保比率"];
+            const below100 = d["100張以下佔集保比率"];
+            const mid =
+              above400 != null && big1000 != null && below100 != null
+                ? Math.max(0, 100 - above400 - below100)
+                : null;
 
-function renderDoughnut(d) {
-  const container = document.getElementById('shareholders-chart-container');
-  container.innerHTML = '<canvas id="shareholders-doughnut"></canvas>';
-  const ctx = document.getElementById('shareholders-doughnut').getContext('2d');
+            // Calculate week-over-week change
+            const prev = sorted[i + 1];
+            const big1000Chg =
+              prev && big1000 != null && prev["1000張以上佔集保比率"] != null
+                ? big1000 - prev["1000張以上佔集保比率"]
+                : null;
 
-  // 這些是累計比率：「X張以上」= 持有 X 張以上的人佔全部的比率
-  const big1000 = d['1000張以上佔集保比率'] || 0;
-  const above400 = d['400張以上佔集保比率'] || 0;
-  const below100 = d['100張以下佔集保比率'] || 0;
-  const mid400to1000 = Math.max(0, above400 - big1000);
-  const mid100to400 = Math.max(0, 100 - above400 - below100);
-  const rest = below100;
-
-  if (doughnutChart) doughnutChart.destroy();
-
-  doughnutChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['1000張以上', '400~1000張', '100~400張', '100張以下'],
-      datasets: [{
-        data: [big1000, mid400to1000, mid100to400, rest],
-        backgroundColor: [
-          'rgba(59,130,246,0.8)',
-          'rgba(168,85,247,0.7)',
-          'rgba(250,204,21,0.7)',
-          'rgba(100,116,139,0.5)',
-        ],
-        borderWidth: 0,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'right',
-          labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 },
-        },
-        tooltip: {
-          callbacks: {
-            label(ctx) {
-              return `${ctx.label}: ${formatPercent(ctx.raw)}`;
-            }
-          }
-        }
-      },
-    },
-  });
-}
-
-function renderTrend(data) {
-  const container = document.getElementById('shareholders-trend-container');
-  container.innerHTML = '<canvas id="shareholders-trend"></canvas>';
-  const ctx = document.getElementById('shareholders-trend').getContext('2d');
-
-  const labels = data.map(d => {
-    const s = String(d['日期']);
-    return s.slice(5); // MM-DD
-  });
-  const bigRatio = data.map(d => d['1000張以上佔集保比率'] || 0);
-
-  if (trendChart) trendChart.destroy();
-
-  trendChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: '1000張以上佔集保比率',
-        data: bigRatio,
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59,130,246,0.1)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 4,
-        pointBackgroundColor: '#3b82f6',
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label(ctx) { return formatPercent(ctx.raw); }
-          }
-        }
-      },
-      scales: {
-        x: {
-          ticks: { color: '#94a3b8', font: { size: 10 } },
-          grid: { display: false },
-        },
-        y: {
-          ticks: {
-            color: '#94a3b8',
-            font: { size: 11 },
-            callback: v => v + '%',
-          },
-          grid: { color: '#334155' },
-        },
-      },
-    },
-  });
+            return `
+          <tr>
+            <td>${shortDate(d["日期"])}</td>
+            <td>
+              ${formatPercent(big1000)}
+              ${big1000Chg != null ? `<span class="text-xs ${valClass(big1000Chg)}">${signStr(big1000Chg)}${Math.abs(big1000Chg).toFixed(2)}</span>` : ""}
+            </td>
+            <td>${formatPercent(above400)}</td>
+            <td>${formatPercent(mid)}</td>
+            <td>${formatPercent(below100)}</td>
+          </tr>`;
+          })
+          .join("")}
+      </tbody>
+    </table>
+  `;
 }
