@@ -36,7 +36,7 @@ export function renderRuleAlerts(ruleResult) {
     .map((r) => {
       const cls = r.triggered ? "chip chip-triggered" : "chip chip-off";
       const dot = r.triggered ? "●" : "○";
-      return `<span class="${cls}">${dot} ${r.name}</span>`;
+      return `<span class="${cls}">${dot} ${r.code} ${r.name}</span>`;
     })
     .join("");
 
