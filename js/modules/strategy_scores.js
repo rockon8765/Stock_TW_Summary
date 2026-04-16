@@ -44,24 +44,22 @@ export function renderStrategyScores(scorecard, ticker) {
   sortRows(rows, currentSort);
   renderTable(el, rows, scorecard.as_of);
 
-  // Sort handler — 綁一次
-  el.querySelectorAll("th[data-sort-key]").forEach((th) => {
-    th.addEventListener("click", () => {
-      const key = th.dataset.sortKey;
-      if (currentSort.key === key) {
-        currentSort.dir = currentSort.dir === "asc" ? "desc" : "asc";
-      } else {
-        currentSort.key = key;
-        currentSort.dir = key === "name" ? "asc" : "desc";
-      }
-      sortRows(rows, currentSort);
-      renderTable(el, rows, scorecard.as_of);
-      // 重新綁 handler（因為 table 被重繪）
-      el.querySelectorAll("th[data-sort-key]").forEach((h) => {
-        h.addEventListener("click", th.onclick);
-      });
-    });
-  });
+  // Sort handler — 事件委派綁在 container 上，renderTable 重繪 DOM 後仍有效
+  el.onclick = (event) => {
+    const th = event.target.closest("th[data-sort-key]");
+    if (!th || !el.contains(th)) return;
+
+    const key = th.dataset.sortKey;
+    if (currentSort.key === key) {
+      currentSort.dir = currentSort.dir === "asc" ? "desc" : "asc";
+    } else {
+      currentSort.key = key;
+      currentSort.dir = key === "name" ? "asc" : "desc";
+    }
+
+    sortRows(rows, currentSort);
+    renderTable(el, rows, scorecard.as_of);
+  };
 }
 
 function sortRows(rows, { key, dir }) {
@@ -101,7 +99,9 @@ function renderTable(el, rows, asOf) {
           ${rows
             .map((r) => {
               const pct = Math.max(0, Math.min(1, r.score)) * 100;
-              const staleClass = r.is_stale ? "strategy-score-row stale" : "strategy-score-row";
+              const staleClass = r.is_stale
+                ? "strategy-score-row stale"
+                : "strategy-score-row";
               const freshness = r.is_stale
                 ? `<span class="stale-badge">過時 ${r.latest_date}</span>`
                 : `<span class="fresh-badge">最新 ${r.latest_date}</span>`;

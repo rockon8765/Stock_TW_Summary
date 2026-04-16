@@ -35,22 +35,14 @@ export function renderCashflow(cfData, annualDiv) {
     String(b["年季"]).localeCompare(String(a["年季"])),
   );
 
-  // FCF 年度現金股利覆蓋倍數：取 TTM FCF / 最近年度現金股利
+  // FCF 現金股利覆蓋倍數：取 TTM FCF / TTM 現金股利發放
   const ttmFcf = ttmFreeCashflow(sorted);
-  const latestAnnualDiv = annualDiv?.[0]?.年度現金股利;
-  const coverage = ttmFcf != null ? safeDiv(ttmFcf, latestAnnualDiv) : null;
 
-  // 注意：annualDiv 的現金股利是「每股」，TTM FCF 是「總額」，單位不一致。
-  // 要換算需要股數。保守處理：覆蓋倍數需要總額除總額，暫以最近年度的「股利總發放額 = 年度現金股利 × 發行股數」估算。
-  // 但 profile 未必有股數精確值，改採較穩妥的相對指標：
-  // - 若 TTM FCF > 0 且 年度股利 > 0，顯示「✓ FCF 為正」、否則警示
-  // 實務上，年度總股利發放額可從 cf 的「發放現金股利」欄位取得（更精確）。這裡先用簡化指標。
+  // annualDiv 的現金股利是「每股」，TTM FCF 是「總額」，單位不一致。
+  // 覆蓋倍數應以總額除總額計算，因此用 cf 的「發放現金股利」欄位加總最近 4 季作為分母。
   const cashDivPaidSum = sorted
     .slice(0, 4)
-    .reduce(
-      (s, r) => s + (Number(r?.["發放現金股利"]) || 0),
-      0,
-    );
+    .reduce((s, r) => s + (Number(r?.["發放現金股利"]) || 0), 0);
   const realCoverage =
     ttmFcf != null && cashDivPaidSum > 0
       ? safeDiv(ttmFcf, Math.abs(cashDivPaidSum))
