@@ -32,6 +32,7 @@ import { renderInsiderGovernance } from "./modules/insider_governance.js";
 import { renderLongTermTrend } from "./modules/long_term_trend.js";
 import { renderRuleAlerts } from "./modules/rule_alerts.js";
 import { renderStrategyScores } from "./modules/strategy_scores.js";
+import { computeRuleAlerts } from "./lib/rule_engine.js";
 import { aggregateDividendsToAnnual } from "./lib/dividend_aggregator.js";
 import { showError } from "./utils.js";
 
@@ -163,9 +164,15 @@ async function search(ticker) {
     showError(document.getElementById("profile-content"), "公司資料渲染錯誤");
   }
 
-  // Section 1.5 (NEW): 規則警示 chips（Profile 區塊內、metric cards 下方）
+  // Section 1.5: 規則警示 chips（即時計算，不依賴 Python pipeline）
   try {
-    renderRuleAlerts(scorecardData, ticker);
+    const ruleResult = computeRuleAlerts({
+      monthsales: data.sales?.data,
+      incomeQ: data.income?.data,
+      quotes: data.quotes?.data,
+      stats: data.stats?.data,
+    });
+    renderRuleAlerts(ruleResult);
   } catch {
     showError(
       document.getElementById("rule-alerts-container"),
