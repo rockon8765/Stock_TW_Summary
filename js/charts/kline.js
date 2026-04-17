@@ -4,6 +4,20 @@ let volumeSeries = null;
 let allData = [];
 let resizeObserver = null;
 
+function getRangeButtons() {
+  return document.querySelectorAll("#kline-range-btns .range-btn");
+}
+
+function syncActiveRangeButton(activeRange) {
+  const buttons = getRangeButtons();
+  buttons.forEach((button) => {
+    button.classList.remove("range-btn-active");
+    if (button.dataset.range === activeRange) {
+      button.classList.add("range-btn-active");
+    }
+  });
+}
+
 export function renderKline(data) {
   const container = document.getElementById("kline-chart");
 
@@ -87,6 +101,7 @@ export function renderKline(data) {
 
 function setRange(range) {
   if (!allData.length) return;
+  syncActiveRangeButton(range);
 
   const now = new Date(allData[allData.length - 1]["日期"]);
   let from = new Date(now);
@@ -135,11 +150,9 @@ function setRange(range) {
 }
 
 function bindRangeButtons() {
-  const btns = document.querySelectorAll("#kline-range-btns .range-btn");
+  const btns = getRangeButtons();
   btns.forEach((btn) => {
     btn.addEventListener("click", () => {
-      btns.forEach((b) => b.classList.remove("range-btn-active"));
-      btn.classList.add("range-btn-active");
       setRange(btn.dataset.range);
     });
   });
