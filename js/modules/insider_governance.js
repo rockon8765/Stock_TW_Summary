@@ -1,4 +1,10 @@
-import { formatPercent, formatNumber } from "../utils.js";
+import {
+  escapeHtml,
+  formatNumber,
+  formatPercent,
+  showNotApplicable,
+  sortDescByKey,
+} from "../utils.js";
 
 /**
  * 渲染公司治理（內部人持股 + 設質）表格。
@@ -16,13 +22,11 @@ export function renderInsiderGovernance(insiderData) {
   if (!container) return;
 
   if (!Array.isArray(insiderData) || insiderData.length === 0) {
-    container.innerHTML = '<div class="section-error">無公司治理資料</div>';
+    showNotApplicable(container, "此標的暫無公司治理資料");
     return;
   }
 
-  const sorted = [...insiderData].sort((a, b) =>
-    String(b["年月"]).localeCompare(String(a["年月"])),
-  );
+  const sorted = sortDescByKey(insiderData, "年月");
 
   const pledgeCell = (pct) => {
     if (pct == null || !Number.isFinite(Number(pct))) return "—";
@@ -68,7 +72,7 @@ export function renderInsiderGovernance(insiderData) {
           .map(
             (r) => `
           <tr>
-            <td>${r["年月"] ?? ""}</td>
+            <td>${escapeHtml(r["年月"] ?? "")}</td>
             <td>${formatPercent(r["董監持股比例"])}</td>
             <td>${changeCell(r["董監持股比例增減"])}</td>
             <td>${formatPercent(r["經理人持股比例"])}</td>

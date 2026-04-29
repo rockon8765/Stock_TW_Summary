@@ -1,10 +1,25 @@
-import { formatNumber, formatPercent, calcRate, valClass } from '../utils.js';
+import {
+  calcRate,
+  escapeHtml,
+  formatNumber,
+  formatPercent,
+  formatRevenueFromThousand,
+  showNotApplicable,
+  sortDescByKey,
+  valClassLevel,
+} from "../utils.js";
 
 export function renderIncome(data) {
   const container = document.getElementById('income-table-container');
+  if (!container) return;
+
+  if (!Array.isArray(data) || data.length === 0) {
+    showNotApplicable(container, "此標的暫無季度損益資料");
+    return;
+  }
 
   // Sort descending (newest first)
-  const sorted = [...data].sort((a, b) => String(b['年季']).localeCompare(String(a['年季'])));
+  const sorted = sortDescByKey(data, "年季").slice(0, 8);
 
   const rows = sorted.map(d => {
     const rev = d['營業收入淨額'];
@@ -17,7 +32,14 @@ export function renderIncome(data) {
     const opM = calcRate(op, rev);
     const netM = calcRate(net, rev);
 
-    return { quarter: d['年季'], rev, grossM, opM, netM, eps };
+    return {
+      quarter: d["年季"],
+      rev,
+      grossM,
+      opM,
+      netM,
+      eps,
+    };
   });
 
   container.innerHTML = `
@@ -35,12 +57,12 @@ export function renderIncome(data) {
       <tbody>
         ${rows.map(r => `
           <tr>
-            <td>${r.quarter || ''}</td>
-            <td>${r.rev != null ? (r.rev / 1e4).toFixed(0) + ' 百萬' : '—'}</td>
-            <td class="${valClass(r.grossM)}">${formatPercent(r.grossM)}</td>
-            <td class="${valClass(r.opM)}">${formatPercent(r.opM)}</td>
-            <td class="${valClass(r.netM)}">${formatPercent(r.netM)}</td>
-            <td class="${valClass(r.eps)}">${r.eps != null ? formatNumber(r.eps, 2) : '—'}</td>
+            <td>${escapeHtml(r.quarter || "")}</td>
+            <td>${formatRevenueFromThousand(r.rev, "營業收入淨額")}</td>
+            <td class="${valClassLevel(r.grossM)}">${formatPercent(r.grossM, 2, "毛利率")}</td>
+            <td class="${valClassLevel(r.opM)}">${formatPercent(r.opM, 2, "營益率")}</td>
+            <td class="${valClassLevel(r.netM)}">${formatPercent(r.netM, 2, "淨利率")}</td>
+            <td class="${valClassLevel(r.eps)}">${r.eps != null ? formatNumber(r.eps, 2, "每股稅後盈餘") : "—"}</td>
           </tr>
         `).join('')}
       </tbody>

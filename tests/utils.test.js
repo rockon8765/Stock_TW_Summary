@@ -1,6 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { safeDiv, cagr } from "../js/utils.js";
+import {
+  buildLoadingMarkup,
+  cagr,
+  escapeHtml,
+  formatNumber,
+  formatPercent,
+  formatRevenue,
+  formatRevenueFromThousand,
+  resolveRetryTicker,
+  safeDiv,
+  showError,
+  showNotApplicable,
+  valClassChange,
+  valClassLevel,
+} from "../js/utils.js";
 
 // --- safeDiv ---
 
@@ -30,6 +44,119 @@ test("safeDiv string-coercible inputs work", () => {
 
 test("safeDiv null numerator coerces to 0 (Number(null)===0)", () => {
   assert.equal(safeDiv(null, 5), 0);
+});
+
+// --- formatting helpers ---
+
+test("formatRevenue renders base-currency amounts in 億 with locale separators", () => {
+  assert.equal(formatRevenue(415191699000), "4,151.92 億");
+});
+
+test("formatRevenueFromThousand converts 仟元 input before formatting", () => {
+  assert.equal(formatRevenueFromThousand(415191699), "4,151.92 億");
+});
+
+test("formatNumber warns on malformed numeric input", () => {
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    assert.equal(formatNumber("abc", 2, "測試欄位"), "—");
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 1);
+  assert.match(String(warnings[0][0]), /formatNumber/);
+  assert.deepEqual(warnings[0][1], {
+    field: "測試欄位",
+    rawValue: "abc",
+  });
+});
+
+test("formatPercent warns on malformed numeric input", () => {
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    assert.equal(formatPercent(undefined, 2, "漲幅"), "—");
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 1);
+  assert.match(String(warnings[0][0]), /formatPercent/);
+  assert.deepEqual(warnings[0][1], {
+    field: "漲幅",
+    rawValue: undefined,
+  });
+});
+
+// --- value semantics ---
+
+test("valClassChange keeps directional semantics for deltas", () => {
+  assert.equal(valClassChange(1), "val-up");
+  assert.equal(valClassChange(-1), "val-down");
+  assert.equal(valClassChange(0), "val-neutral");
+});
+
+test("valClassLevel keeps level metrics neutral regardless of sign", () => {
+  assert.equal(valClassLevel(12.3), "val-neutral");
+  assert.equal(valClassLevel(-4.5), "val-neutral");
+  assert.equal(valClassLevel(null), "val-neutral");
+});
+
+test("showNotApplicable renders a neutral empty-state message", () => {
+  const element = { innerHTML: "" };
+  showNotApplicable(element, "ETF 不提供季度損益");
+
+  assert.match(element.innerHTML, /section-empty/);
+  assert.match(element.innerHTML, /role="status"/);
+  assert.match(element.innerHTML, /ETF 不提供季度損益/);
+});
+
+test("showError can include a retry affordance for failed sections", () => {
+  const element = { innerHTML: "" };
+  showError(element, "載入失敗", { retrySection: "income" });
+
+  assert.match(element.innerHTML, /section-error/);
+  assert.match(element.innerHTML, /role="alert"/);
+  assert.match(element.innerHTML, /data-retry-section="income"/);
+});
+
+test("showError can bind retry buttons to the currently rendered ticker", () => {
+  const element = { innerHTML: "" };
+  showError(element, "載入失敗", {
+    retrySection: "income",
+    retryTicker: "2330",
+  });
+
+  assert.match(element.innerHTML, /data-retry-ticker="2330"/);
+});
+
+test("resolveRetryTicker prefers the rendered ticker over an unsent input draft", () => {
+  assert.equal(resolveRetryTicker("2330", "2317"), "2330");
+});
+
+test("buildLoadingMarkup exposes an accessible status message for skeleton UIs", () => {
+  const html = buildLoadingMarkup("季度損益", {
+    containerClass: "h-full flex items-center justify-center",
+    skeletonClass: "h-64 w-full rounded-lg",
+  });
+
+  assert.match(html, /role="status"/);
+  assert.match(html, /aria-live="polite"/);
+  assert.match(html, /季度損益載入中/);
+  assert.match(html, /class="skeleton h-64 w-full rounded-lg"/);
+});
+
+test("escapeHtml neutralizes text before it reaches innerHTML", () => {
+  assert.equal(
+    escapeHtml('<script>alert("x")</script> & test'),
+    "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; test",
+  );
 });
 
 // --- cagr ---

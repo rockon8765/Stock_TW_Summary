@@ -1,11 +1,20 @@
-import { formatNumber, formatPercent, calcRate, valClass } from "../utils.js";
+import {
+  calcRate,
+  escapeHtml,
+  formatNumber,
+  formatPercent,
+  showNotApplicable,
+  sortDescByKey,
+  valClassLevel,
+  valueFromThousandToYi,
+} from "../utils.js";
 
 export function renderValuation(incomeData, bsData) {
   const container = document.getElementById("valuation-table-container");
   if (!container) return;
 
   if (!incomeData?.length) {
-    container.innerHTML = '<div class="section-error">無估值趨勢資料</div>';
+    showNotApplicable(container, "此標的暫無估值趨勢資料");
     return;
   }
 
@@ -16,9 +25,7 @@ export function renderValuation(incomeData, bsData) {
     }
   }
 
-  const sorted = [...incomeData].sort((a, b) =>
-    String(b["年季"]).localeCompare(String(a["年季"])),
-  );
+  const sorted = sortDescByKey(incomeData, "年季").slice(0, 8);
 
   const rows = sorted.map((d) => {
     const quarter = d["年季"];
@@ -29,7 +36,14 @@ export function renderValuation(incomeData, bsData) {
     const grossM = calcRate(gross, rev);
     const opM = calcRate(op, rev);
     const bv = bsMap[quarter]?.["每股淨值"];
-    return { quarter, rev, grossM, opM, eps, bv };
+    return {
+      quarter,
+      revYi: valueFromThousandToYi(rev, "營業收入淨額"),
+      grossM,
+      opM,
+      eps,
+      bv,
+    };
   });
 
   container.innerHTML = `
@@ -49,11 +63,11 @@ export function renderValuation(incomeData, bsData) {
           .map(
             (r) => `
           <tr>
-            <td>${r.quarter || ""}</td>
-            <td>${r.rev != null ? formatNumber(r.rev / 1e8, 2) : "—"}</td>
-            <td class="${valClass(r.grossM)}">${formatPercent(r.grossM)}</td>
-            <td class="${valClass(r.opM)}">${formatPercent(r.opM)}</td>
-            <td class="${valClass(r.eps)}">${r.eps != null ? formatNumber(r.eps, 2) : "—"}</td>
+            <td>${escapeHtml(r.quarter || "")}</td>
+            <td>${r.revYi != null ? formatNumber(r.revYi, 2, "營業收入淨額") : "—"}</td>
+            <td class="${valClassLevel(r.grossM)}">${formatPercent(r.grossM, 2, "毛利率")}</td>
+            <td class="${valClassLevel(r.opM)}">${formatPercent(r.opM, 2, "營益率")}</td>
+            <td class="${valClassLevel(r.eps)}">${r.eps != null ? formatNumber(r.eps, 2, "每股稅後盈餘") : "—"}</td>
             <td>${r.bv != null ? formatNumber(r.bv, 2) : "—"}</td>
           </tr>`,
           )

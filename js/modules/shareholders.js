@@ -1,18 +1,24 @@
-import { formatPercent, valClass, signStr, shortDate } from "../utils.js";
+import {
+  escapeHtml,
+  formatPercent,
+  shortDate,
+  showNotApplicable,
+  signStr,
+  sortDescByKey,
+  valClass,
+} from "../utils.js";
 
 export function renderShareholders(data) {
   const container = document.getElementById("shareholders-table-container");
   if (!container) return;
 
   if (!data || !data.length) {
-    container.innerHTML = '<div class="section-error">無股權分散資料</div>';
+    showNotApplicable(container, "此標的暫無股權分散資料");
     return;
   }
 
   // Sort descending by date (newest first)
-  const sorted = [...data].sort((a, b) =>
-    String(b["日期"]).localeCompare(String(a["日期"])),
-  );
+  const sorted = sortDescByKey(data, "日期");
 
   container.innerHTML = `
     <table class="data-table">
@@ -45,7 +51,7 @@ export function renderShareholders(data) {
 
             return `
           <tr>
-            <td>${shortDate(d["日期"])}</td>
+            <td>${escapeHtml(shortDate(d["日期"]))}</td>
             <td>
               ${formatPercent(big1000)}
               ${big1000Chg != null ? `<span class="text-xs ${valClass(big1000Chg)}">${signStr(big1000Chg)}${Math.abs(big1000Chg).toFixed(2)}</span>` : ""}

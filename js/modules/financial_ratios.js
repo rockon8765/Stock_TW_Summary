@@ -1,11 +1,10 @@
-import { formatNumber, formatPercent, FIELD, safeDiv } from "../utils.js";
-
-/** 由新到舊排序（in place safe） */
-function sortedDescByQuarter(arr) {
-  return [...(arr ?? [])].sort((a, b) =>
-    String(b["年季"]).localeCompare(String(a["年季"])),
-  );
-}
+import {
+  FIELD,
+  formatNumber,
+  formatPercent,
+  safeDiv,
+  sortDescByKey,
+} from "../utils.js";
 
 /** 取前 N 季某欄位之加總（TTM 可取 N=4） */
 function sumTopN(arr, field, n) {
@@ -65,9 +64,9 @@ export function renderFinancialRatios({ incomeQ, bsQ, cfQ }) {
   const container = document.getElementById("ratios-dashboard-container");
   if (!container) return;
 
-  const incDesc = sortedDescByQuarter(incomeQ);
-  const bsDesc = sortedDescByQuarter(bsQ);
-  const cfDesc = sortedDescByQuarter(cfQ);
+  const incDesc = sortDescByKey(incomeQ, "年季");
+  const bsDesc = sortDescByKey(bsQ, "年季");
+  const cfDesc = sortDescByKey(cfQ, "年季");
 
   // 1. ROE_TTM
   const niTTM = sumTopN(incDesc, FIELD.NI_PARENT, 4);

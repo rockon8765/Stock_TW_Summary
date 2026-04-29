@@ -24,7 +24,11 @@ import { renderRevenue } from "./modules/revenue.js";
 import { renderIncome } from "./modules/income.js";
 import { renderInstitutional } from "./modules/institutional.js";
 import { renderShareholders } from "./modules/shareholders.js";
-import { loadStrategyData, renderStrategy } from "./modules/strategy.js";
+import {
+  ensureStrategyDataLoaded,
+  loadStrategyData,
+  renderStrategy,
+} from "./modules/strategy.js";
 import { renderCashflow } from "./modules/cashflow.js";
 import { renderFinancialRatios } from "./modules/financial_ratios.js";
 import { renderRiskTechnical } from "./modules/risk_technical.js";
@@ -34,64 +38,185 @@ import { renderRuleAlerts } from "./modules/rule_alerts.js";
 import { renderStrategyScores } from "./modules/strategy_scores.js";
 import { computeRuleAlerts } from "./lib/rule_engine.js";
 import { aggregateDividendsToAnnual } from "./lib/dividend_aggregator.js";
-import { showError } from "./utils.js";
+import {
+  buildLoadingMarkup,
+  latestRowByKey,
+  resolveRetryTicker,
+  showError,
+} from "./utils.js";
+import { createRetryableSnapshotLoader } from "./lib/strategy_snapshot_loader.js";
 
 let abortController = null;
-
-// 策略分數是全域 snapshot（非 per-ticker）：首次查詢連同載入、後續切 ticker 走快取。
-let strategySnapshotData = null;
-let strategySnapshotLoadedOnce = false;
+const strategySnapshotLoader = createRetryableSnapshotLoader(
+  fetchStrategySnapshot,
+);
 
 const tickerInput = document.getElementById("ticker-input");
+const searchForm = document.getElementById("ticker-search-form");
 const searchBtn = document.getElementById("search-btn");
+const printExportBtn = document.getElementById("print-export-btn");
+const jsonExportBtn = document.getElementById("json-export-btn");
 const welcomeMsg = document.getElementById("welcome-msg");
 const dataContainer = document.getElementById("data-container");
+const dataAsOf = document.getElementById("data-as-of");
+const busySectionIds = [
+  "profile-content",
+  "valuation-table-container",
+  "dividend-table-container",
+  "revenue-table-container",
+  "income-table-container",
+  "institutional-table-container",
+  "institutional-cards",
+  "shareholders-table-container",
+  "kline-chart",
+  "strategy-holding-container",
+  "strategy-trade-container",
+  "ratios-dashboard-container",
+  "cashflow-table-container",
+  "longterm-trend-container",
+  "governance-table-container",
+  "risk-tech-container",
+  "rule-alerts-container",
+  "strategy-scores-container",
+];
+let latestExportPayload = null;
+
+function latestValueByDate(rows, dateField, valueField = dateField) {
+  const latest = latestRowByKey(rows, dateField);
+  return latest?.[valueField] ? String(latest[valueField]) : "";
+}
+
+function setExportButtonsEnabled(isEnabled) {
+  [printExportBtn, jsonExportBtn].forEach((button) => {
+    if (!button) return;
+    button.disabled = !isEnabled;
+    button.setAttribute("aria-disabled", String(!isEnabled));
+  });
+}
+
+function updateExportPayload(ticker, data) {
+  latestExportPayload = {
+    exported_at: new Date().toISOString(),
+    ticker,
+    datasets: Object.fromEntries(
+      Object.entries(data).map(([key, value]) => [key, value?.data ?? value]),
+    ),
+  };
+  setExportButtonsEnabled(true);
+}
+
+function exportCurrentSnapshot() {
+  if (!latestExportPayload) return;
+
+  const exportedDate = latestExportPayload.exported_at.slice(0, 10);
+  const filename = `${latestExportPayload.ticker || "stock"}-snapshot-${exportedDate}.json`;
+  const blob = new Blob([JSON.stringify(latestExportPayload, null, 2)], {
+    type: "application/json",
+  });
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(objectUrl);
+}
+
+function setDataTimestamp(parts = []) {
+  if (!dataAsOf) return;
+  dataAsOf.textContent =
+    parts.length > 0 ? `資料時間：${parts.join(" ｜ ")}` : "資料時間：—";
+}
+
+function updateDataTimestamp({ quotes, sales, income }) {
+  const quoteDate = latestValueByDate(quotes, "日期");
+  const salesAnnouncement = latestValueByDate(sales, "公告日");
+  const incomeAnnouncement =
+    latestValueByDate(income, "公告日期") ||
+    latestValueByDate(income, "公告日");
+
+  const parts = [];
+  if (quoteDate) parts.push(`報價 ${quoteDate}`);
+  if (salesAnnouncement) parts.push(`月營收公告 ${salesAnnouncement}`);
+  if (incomeAnnouncement) parts.push(`季報公告 ${incomeAnnouncement}`);
+
+  setDataTimestamp(parts);
+}
+
+function setSectionsBusyState(isBusy) {
+  for (const id of busySectionIds) {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute("aria-busy", String(isBusy));
+  }
+}
 
 function resetSections() {
   const skeletons = {
-    "profile-content":
-      '<div class="skeleton h-6 w-48 mb-3"></div><div class="skeleton h-4 w-96"></div>',
-    "valuation-table-container":
-      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
-    "dividend-table-container":
-      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
-    "revenue-table-container":
-      '<div class="section-loading"><div class="skeleton h-40 w-full rounded-lg"></div></div>',
-    "income-table-container":
-      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
-    "institutional-table-container":
-      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
-    "institutional-cards":
-      '<div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div><div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div><div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>',
-    "shareholders-table-container":
-      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
-    "kline-chart":
-      '<div class="section-loading h-full flex items-center justify-center"><div class="skeleton h-full w-full rounded-lg"></div></div>',
-    "strategy-holding-container":
-      '<div class="section-loading"><div class="skeleton h-48 w-full rounded-lg"></div></div>',
-    "strategy-trade-container":
-      '<div class="section-loading"><div class="skeleton h-48 w-full rounded-lg"></div></div>',
-    "ratios-dashboard-container":
-      '<div class="section-loading"><div class="skeleton h-20 w-full rounded-lg"></div></div>'.repeat(
-        6,
-      ),
-    "cashflow-table-container":
-      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
-    "longterm-trend-container":
-      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
-    "governance-table-container":
-      '<div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>',
-    "risk-tech-container":
-      '<div class="section-loading"><div class="skeleton h-48 w-full rounded-lg"></div></div>',
-    "rule-alerts-container":
-      '<div class="section-loading"><div class="skeleton h-12 w-full rounded-lg"></div></div>',
-    "strategy-scores-container":
-      '<div class="section-loading"><div class="skeleton h-48 w-full rounded-lg"></div></div>',
+    "profile-content": buildLoadingMarkup("公司概要", {
+      contentHtml:
+        '<div class="skeleton h-6 w-48 mb-3"></div><div class="skeleton h-4 w-96"></div>',
+    }),
+    "valuation-table-container": buildLoadingMarkup("估值趨勢", {
+      skeletonClass: "h-64 w-full rounded-lg",
+    }),
+    "dividend-table-container": buildLoadingMarkup("股利發放歷史", {
+      skeletonClass: "h-64 w-full rounded-lg",
+    }),
+    "revenue-table-container": buildLoadingMarkup("月營收", {
+      skeletonClass: "h-40 w-full rounded-lg",
+    }),
+    "income-table-container": buildLoadingMarkup("季度損益", {
+      skeletonClass: "h-64 w-full rounded-lg",
+    }),
+    "institutional-table-container": buildLoadingMarkup("三大法人買賣超", {
+      skeletonClass: "h-64 w-full rounded-lg",
+    }),
+    "institutional-cards": Array.from({ length: 3 }, () =>
+      buildLoadingMarkup("法人摘要卡片", {
+        skeletonClass: "h-24 w-full rounded-lg",
+      }),
+    ).join(""),
+    "shareholders-table-container": buildLoadingMarkup("股權分散表", {
+      skeletonClass: "h-64 w-full rounded-lg",
+    }),
+    "kline-chart": buildLoadingMarkup("K 線圖", {
+      containerClass: "h-full flex items-center justify-center",
+      skeletonClass: "h-full w-full rounded-lg",
+    }),
+    "strategy-holding-container": buildLoadingMarkup("策略持有績效", {
+      skeletonClass: "h-48 w-full rounded-lg",
+    }),
+    "strategy-trade-container": buildLoadingMarkup("策略歷史交易績效", {
+      skeletonClass: "h-48 w-full rounded-lg",
+    }),
+    "ratios-dashboard-container": Array.from({ length: 6 }, () =>
+      buildLoadingMarkup("財務比率儀表板", {
+        skeletonClass: "h-20 w-full rounded-lg",
+      }),
+    ).join(""),
+    "cashflow-table-container": buildLoadingMarkup("現金流摘要", {
+      skeletonClass: "h-64 w-full rounded-lg",
+    }),
+    "longterm-trend-container": buildLoadingMarkup("5 年長期趨勢", {
+      skeletonClass: "h-64 w-full rounded-lg",
+    }),
+    "governance-table-container": buildLoadingMarkup("公司治理", {
+      skeletonClass: "h-64 w-full rounded-lg",
+    }),
+    "risk-tech-container": buildLoadingMarkup("風險與技術面", {
+      skeletonClass: "h-48 w-full rounded-lg",
+    }),
+    "rule-alerts-container": buildLoadingMarkup("即時規則警示", {
+      skeletonClass: "h-12 w-full rounded-lg",
+    }),
+    "strategy-scores-container": buildLoadingMarkup("策略買入分數", {
+      skeletonClass: "h-48 w-full rounded-lg",
+    }),
   };
   for (const [id, html] of Object.entries(skeletons)) {
     const el = document.getElementById(id);
     if (el) el.innerHTML = html;
   }
+  setSectionsBusyState(true);
 }
 
 async function search(ticker) {
@@ -104,6 +229,16 @@ async function search(ticker) {
   welcomeMsg.classList.add("hidden");
   dataContainer.classList.remove("hidden");
   resetSections();
+  setDataTimestamp(["載入中"]);
+  latestExportPayload = null;
+  setExportButtonsEnabled(false);
+
+  const strategyDataPromise = ensureStrategyDataLoaded();
+  const strategySnapshotPromise = strategySnapshotLoader.load(signal);
+  const retryOptions = (section) => ({
+    retrySection: section,
+    retryTicker: ticker,
+  });
 
   const tasks = [
     { key: "quotes", fn: () => fetchDailyQuotes(ticker, signal) },
@@ -127,24 +262,34 @@ async function search(ticker) {
     { key: "annualBs", fn: () => fetchAnnualBS(ticker, signal) },
   ];
 
-  // 首次查詢含策略分數 snapshot（全域 snapshot、非 per-ticker）
-  if (!strategySnapshotLoadedOnce) {
-    tasks.push({ key: "strategySnapshot", fn: () => fetchStrategySnapshot(signal) });
-  }
-
   const results = await Promise.allSettled(tasks.map((t) => t.fn()));
   const data = {};
   results.forEach((r, i) => {
     data[tasks[i].key] = r.status === "fulfilled" ? r.value : null;
   });
 
+  let strategySnapshotData;
+  try {
+    [, strategySnapshotData] = await Promise.all([
+      strategyDataPromise,
+      strategySnapshotPromise,
+    ]);
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    throw error;
+  }
+
   if (signal.aborted) return;
 
-  // 首次將策略分數 snapshot 放入快取
-  if (!strategySnapshotLoadedOnce) {
-    strategySnapshotData = data.strategySnapshot; // null 或整包 JSON
-    strategySnapshotLoadedOnce = true;
-  }
+  updateDataTimestamp({
+    quotes: data.quotes?.data,
+    sales: data.sales?.data,
+    income: data.income?.data,
+  });
+  updateExportPayload(ticker, {
+    ...data,
+    strategySnapshot: strategySnapshotLoader.getCached() ?? strategySnapshotData,
+  });
 
   // 季→年股利聚合（供 dividend / cashflow / financial_ratios / long_term_trend 共用）
   const annualDiv = aggregateDividendsToAnnual(data.dividend?.data);
@@ -159,9 +304,17 @@ async function search(ticker) {
         data.income?.data,
       );
     else
-      showError(document.getElementById("profile-content"), "公司資料載入失敗");
+      showError(
+        document.getElementById("profile-content"),
+        "公司資料載入失敗",
+        retryOptions("profile"),
+      );
   } catch {
-    showError(document.getElementById("profile-content"), "公司資料渲染錯誤");
+    showError(
+      document.getElementById("profile-content"),
+      "公司資料渲染錯誤",
+      retryOptions("profile"),
+    );
   }
 
   // Section 1.5: 即時規則警示（只讀 Live API，不依賴策略分數 snapshot）
@@ -177,6 +330,7 @@ async function search(ticker) {
     showError(
       document.getElementById("rule-alerts-container"),
       "規則警示渲染錯誤",
+      retryOptions("rule-alerts"),
     );
   }
 
@@ -187,17 +341,19 @@ async function search(ticker) {
       showError(
         document.getElementById("valuation-table-container"),
         "估值趨勢資料載入失敗",
+        retryOptions("valuation"),
       );
   } catch {
     showError(
       document.getElementById("valuation-table-container"),
       "估值趨勢渲染錯誤",
+      retryOptions("valuation"),
     );
   }
 
   // Section 2b: Dividend history（年度視圖，修正既有 bug）
   try {
-    if (annualDiv.length > 0) {
+    if (data.dividend) {
       renderDividend({
         annualDiv,
         quotes: data.quotes?.data,
@@ -207,12 +363,14 @@ async function search(ticker) {
       showError(
         document.getElementById("dividend-table-container"),
         "股利資料載入失敗",
+        retryOptions("dividend"),
       );
     }
   } catch {
     showError(
       document.getElementById("dividend-table-container"),
       "股利渲染錯誤",
+      retryOptions("dividend"),
     );
   }
 
@@ -223,11 +381,13 @@ async function search(ticker) {
       showError(
         document.getElementById("revenue-table-container"),
         "營收資料載入失敗",
+        retryOptions("revenue"),
       );
   } catch {
     showError(
       document.getElementById("revenue-table-container"),
       "營收渲染錯誤",
+      retryOptions("revenue"),
     );
   }
 
@@ -238,11 +398,13 @@ async function search(ticker) {
       showError(
         document.getElementById("income-table-container"),
         "損益資料載入失敗",
+        retryOptions("income"),
       );
   } catch {
     showError(
       document.getElementById("income-table-container"),
       "損益渲染錯誤",
+      retryOptions("income"),
     );
   }
 
@@ -258,12 +420,14 @@ async function search(ticker) {
       showError(
         document.getElementById("institutional-table-container"),
         "法人資料載入失敗",
+        retryOptions("institutional"),
       );
     }
   } catch {
     showError(
       document.getElementById("institutional-table-container"),
       "法人渲染錯誤",
+      retryOptions("institutional"),
     );
   }
 
@@ -274,32 +438,42 @@ async function search(ticker) {
       showError(
         document.getElementById("shareholders-table-container"),
         "股權資料載入失敗",
+        retryOptions("shareholders"),
       );
   } catch {
     showError(
       document.getElementById("shareholders-table-container"),
       "股權渲染錯誤",
+      retryOptions("shareholders"),
     );
   }
 
   // Section 5: K-line (rendered but collapsed)
   try {
     if (data.quotes) renderKline(data.quotes.data);
-    else showError(document.getElementById("kline-chart"), "K 線資料載入失敗");
+    else
+      showError(document.getElementById("kline-chart"), "K 線資料載入失敗", {
+        ...retryOptions("kline"),
+      });
   } catch (e) {
     showError(
       document.getElementById("kline-chart"),
       "K 線渲染錯誤: " + e.message,
+      retryOptions("kline"),
     );
   }
 
   // Section 5.5 (NEW): 策略買入分數表（K 線之後、估值之前）
   try {
-    renderStrategyScores(strategySnapshotData, ticker);
+    renderStrategyScores(
+      strategySnapshotLoader.getCached() ?? strategySnapshotData,
+      ticker,
+    );
   } catch {
     showError(
       document.getElementById("strategy-scores-container"),
       "策略分數渲染錯誤",
+      retryOptions("strategy-scores"),
     );
   }
 
@@ -310,6 +484,7 @@ async function search(ticker) {
     showError(
       document.getElementById("strategy-holding-container"),
       "策略資料渲染錯誤",
+      retryOptions("strategy"),
     );
   }
 
@@ -326,6 +501,7 @@ async function search(ticker) {
     showError(
       document.getElementById("ratios-dashboard-container"),
       "財務比率渲染錯誤",
+      retryOptions("ratios"),
     );
   }
 
@@ -336,11 +512,13 @@ async function search(ticker) {
       showError(
         document.getElementById("cashflow-table-container"),
         "現金流資料載入失敗",
+        retryOptions("cashflow"),
       );
   } catch {
     showError(
       document.getElementById("cashflow-table-container"),
       "現金流渲染錯誤",
+      retryOptions("cashflow"),
     );
   }
 
@@ -352,11 +530,13 @@ async function search(ticker) {
       showError(
         document.getElementById("longterm-trend-container"),
         "年度財報載入失敗",
+        retryOptions("longterm"),
       );
   } catch {
     showError(
       document.getElementById("longterm-trend-container"),
       "長期趨勢渲染錯誤",
+      retryOptions("longterm"),
     );
   }
 
@@ -367,11 +547,13 @@ async function search(ticker) {
       showError(
         document.getElementById("governance-table-container"),
         "公司治理資料載入失敗",
+        retryOptions("governance"),
       );
   } catch {
     showError(
       document.getElementById("governance-table-container"),
       "公司治理渲染錯誤",
+      retryOptions("governance"),
     );
   }
 
@@ -382,13 +564,17 @@ async function search(ticker) {
       showError(
         document.getElementById("risk-tech-container"),
         "技術指標載入失敗",
+        retryOptions("risk-tech"),
       );
   } catch {
     showError(
       document.getElementById("risk-tech-container"),
       "技術指標渲染錯誤",
+      retryOptions("risk-tech"),
     );
   }
+
+  setSectionsBusyState(false);
 }
 
 // K-line collapse toggle
@@ -415,10 +601,40 @@ function debouncedSearch() {
   debounceTimer = setTimeout(() => search(ticker), 300);
 }
 
-searchBtn.addEventListener("click", debouncedSearch);
-tickerInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") debouncedSearch();
+if (searchForm) {
+  searchForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    debouncedSearch();
+  });
+} else if (searchBtn) {
+  searchBtn.addEventListener("click", debouncedSearch);
+}
+
+dataContainer.addEventListener("click", (event) => {
+  const retryButton = event.target.closest("button[data-retry-section]");
+  if (!retryButton) return;
+
+  const ticker = resolveRetryTicker(
+    retryButton.dataset.retryTicker,
+    tickerInput?.value,
+  );
+  if (!ticker) return;
+
+  if (tickerInput) tickerInput.value = ticker;
+  search(ticker);
 });
+
+if (printExportBtn) {
+  printExportBtn.addEventListener("click", () => {
+    if (!latestExportPayload) return;
+    window.print();
+  });
+}
+
+if (jsonExportBtn) {
+  jsonExportBtn.addEventListener("click", exportCurrentSnapshot);
+}
 
 // Pre-load strategy CSV data
 loadStrategyData();
+setExportButtonsEnabled(false);

@@ -1,4 +1,12 @@
-import { formatRevenue, formatNumber, FIELD, safeDiv } from "../utils.js";
+import {
+  FIELD,
+  escapeHtml,
+  formatNumber,
+  formatRevenueFromThousand,
+  safeDiv,
+  showNotApplicable,
+  sortDescByKey,
+} from "../utils.js";
 
 /**
  * 取最近 4 季的自由現金流量加總（TTM FCF）。
@@ -27,24 +35,24 @@ export function renderCashflow(cfData, annualDiv) {
   if (!container) return;
 
   if (!Array.isArray(cfData) || cfData.length === 0) {
-    container.innerHTML = '<div class="section-error">無現金流資料</div>';
+    showNotApplicable(container, "此標的暫無現金流資料");
     return;
   }
 
-  const sorted = [...cfData].sort((a, b) =>
-    String(b["年季"]).localeCompare(String(a["年季"])),
-  );
+  const sorted = sortDescByKey(cfData, "年季");
 
   // FCF 現金股利覆蓋倍數：取 TTM FCF / TTM 現金股利發放
   const ttmFcf = ttmFreeCashflow(sorted);
 
   // annualDiv 的現金股利是「每股」，TTM FCF 是「總額」，單位不一致。
   // 覆蓋倍數應以總額除總額計算，因此用 cf 的「發放現金股利」欄位加總最近 4 季作為分母。
+  // 注意：「發放現金股利」為現金流出，API 回傳通常為負值，故判斷 !== 0 而非 > 0，
+  // 並用 Math.abs 確保覆蓋倍數為正值（與 financial_ratios.js 對齊）。
   const cashDivPaidSum = sorted
     .slice(0, 4)
     .reduce((s, r) => s + (Number(r?.["發放現金股利"]) || 0), 0);
   const realCoverage =
-    ttmFcf != null && cashDivPaidSum > 0
+    ttmFcf != null && cashDivPaidSum !== 0
       ? safeDiv(ttmFcf, Math.abs(cashDivPaidSum))
       : null;
 
@@ -57,8 +65,8 @@ export function renderCashflow(cfData, annualDiv) {
         </div>
       </div>
       <div class="text-xs text-muted text-right">
-        TTM FCF：${ttmFcf != null ? formatRevenue(ttmFcf * 1000) : "—"}<br>
-        TTM 現金股利發放：${cashDivPaidSum ? formatRevenue(Math.abs(cashDivPaidSum) * 1000) : "—"}
+        TTM FCF：${ttmFcf != null ? formatRevenueFromThousand(ttmFcf, "TTM FCF") : "—"}<br>
+        TTM 現金股利發放：${cashDivPaidSum ? formatRevenueFromThousand(Math.abs(cashDivPaidSum), "TTM 現金股利發放") : "—"}
       </div>
     </div>
   `;
@@ -86,11 +94,11 @@ export function renderCashflow(cfData, annualDiv) {
             const fcf = Number(r[FIELD.FCF]);
             return `
               <tr>
-                <td>${r["年季"] ?? ""}</td>
-                <td>${Number.isFinite(ocf) ? formatRevenue(ocf * 1000) : "—"}</td>
-                <td>${Number.isFinite(icf) ? formatRevenue(icf * 1000) : "—"}</td>
-                <td>${Number.isFinite(ffn) ? formatRevenue(ffn * 1000) : "—"}</td>
-                <td class="${Number.isFinite(fcf) ? (fcf >= 0 ? "val-up" : "val-down") : ""}">${Number.isFinite(fcf) ? formatRevenue(fcf * 1000) : "—"}</td>
+                <td>${escapeHtml(r["年季"] ?? "")}</td>
+                <td>${Number.isFinite(ocf) ? formatRevenueFromThousand(ocf, FIELD.OCF) : "—"}</td>
+                <td>${Number.isFinite(icf) ? formatRevenueFromThousand(icf, FIELD.ICF) : "—"}</td>
+                <td>${Number.isFinite(ffn) ? formatRevenueFromThousand(ffn, FIELD.FCF_FIN) : "—"}</td>
+                <td class="${Number.isFinite(fcf) ? (fcf >= 0 ? "val-up" : "val-down") : ""}">${Number.isFinite(fcf) ? formatRevenueFromThousand(fcf, FIELD.FCF) : "—"}</td>
               </tr>`;
           })
           .join("")}
