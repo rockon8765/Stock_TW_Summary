@@ -90,7 +90,7 @@ export function fetchQuarterlyIncome(ticker, signal) {
     "md_cm_fi_is_quarterly",
     {
       ticker,
-      page_size: 8,
+      page_size: 14,
     },
     signal,
   );

@@ -97,7 +97,7 @@ test("renderProfile escapes upstream text before writing to innerHTML", () => {
   });
 });
 
-test("renderStrategyScores escapes snapshot text fields in the rendered table", () => {
+test("renderStrategyScores escapes snapshot text in tooltips and headers, drops latest_date from DOM", () => {
   withMockDocument(
     { "strategy-scores-container": { innerHTML: "", onclick: null } },
     (elements) => {
@@ -106,14 +106,20 @@ test("renderStrategyScores escapes snapshot text fields in the rendered table", 
           as_of: "<b>2026-04-16</b>",
           strategies: [
             {
-              name: '<svg onload="alert(1)">',
+              name: "F14_GMCTS",
               latest_date: "<script>oops()</script>",
-              is_stale: true,
+              is_stale: false,
+            },
+            {
+              name: '<svg onload="alert(1)">',
+              latest_date: "2026-04-16",
+              is_stale: false,
             },
           ],
           tickers: {
             "2330": {
               strategy_scores: {
+                F14_GMCTS: 0.42,
                 '<svg onload="alert(1)">': 0.91,
               },
             },
@@ -127,9 +133,56 @@ test("renderStrategyScores escapes snapshot text fields in the rendered table", 
       assert.doesNotMatch(innerHTML, /<script>oops\(\)<\/script>/);
       assert.doesNotMatch(innerHTML, /<b>2026-04-16<\/b>/);
       assert.match(innerHTML, /&lt;svg onload=&quot;alert\(1\)&quot;&gt;/);
-      assert.match(innerHTML, /&lt;script&gt;oops\(\)&lt;\/script&gt;/);
+      assert.doesNotMatch(innerHTML, /&lt;script&gt;oops\(\)&lt;\/script&gt;/);
       assert.match(innerHTML, /&lt;b&gt;2026-04-16&lt;\/b&gt;/);
       assert.match(innerHTML, /aria-sort="descending"/);
+    },
+  );
+});
+
+test("renderStrategyScores shows NotApplicable when scoresMap is empty", () => {
+  withMockDocument(
+    { "strategy-scores-container": { innerHTML: "", onclick: null } },
+    (elements) => {
+      renderStrategyScores(
+        {
+          as_of: "2026-04-16",
+          strategies: [
+            { name: "F14_A", latest_date: "2026-04-16", is_stale: false },
+          ],
+          tickers: { "2330": { strategy_scores: {} } },
+        },
+        "2330",
+      );
+
+      const { innerHTML } = elements["strategy-scores-container"];
+      assert.doesNotMatch(innerHTML, /strategy-category-row/);
+      assert.doesNotMatch(innerHTML, /<thead>/);
+      assert.match(innerHTML, /未被任何策略評分|此股無分數/);
+    },
+  );
+});
+
+test("renderStrategyScores renders aggregate table when scoresMap is non-empty", () => {
+  withMockDocument(
+    { "strategy-scores-container": { innerHTML: "", onclick: null } },
+    (elements) => {
+      renderStrategyScores(
+        {
+          as_of: "2026-04-16",
+          strategies: [
+            { name: "F14_A", latest_date: "2026-04-16", is_stale: false },
+            { name: "F28_X", latest_date: "2026-04-16", is_stale: false },
+          ],
+          tickers: { "2330": { strategy_scores: { F14_A: 0.5 } } },
+        },
+        "2330",
+      );
+
+      const { innerHTML } = elements["strategy-scores-container"];
+      assert.match(innerHTML, /strategy-category-row/);
+      assert.match(innerHTML, /F28/);
+      assert.match(innerHTML, /—/);
     },
   );
 });

@@ -53,3 +53,35 @@ test("renderIncome keeps level metrics on neutral color semantics", () => {
     assert.match(container.innerHTML, /class="val-neutral">-19\.50/);
   });
 });
+
+test("renderIncome keeps the visible table capped at the latest 8 quarters", () => {
+  withMockElement("income-table-container", (container) => {
+    const quarters = [
+      "202504",
+      "202503",
+      "202502",
+      "202501",
+      "202404",
+      "202403",
+      "202402",
+      "202401",
+      "202304",
+      "202303",
+    ];
+    renderIncome(
+      quarters.map((quarter) => ({
+        年季: quarter,
+        營業收入淨額: 100000,
+        營業毛利淨額: 50000,
+        營業利益: 30000,
+        稅後純益: 20000,
+        每股稅後盈餘: 1,
+      })),
+    );
+
+    assert.match(container.innerHTML, /202504/);
+    assert.match(container.innerHTML, /202401/);
+    assert.doesNotMatch(container.innerHTML, /202304/);
+    assert.doesNotMatch(container.innerHTML, /202303/);
+  });
+});

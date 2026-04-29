@@ -25,7 +25,7 @@ export function renderValuation(incomeData, bsData) {
     }
   }
 
-  const sorted = sortDescByKey(incomeData, "年季");
+  const sorted = sortDescByKey(incomeData, "年季").slice(0, 8);
 
   const rows = sorted.map((d) => {
     const quarter = d["年季"];

@@ -19,7 +19,7 @@ export function renderIncome(data) {
   }
 
   // Sort descending (newest first)
-  const sorted = sortDescByKey(data, "年季");
+  const sorted = sortDescByKey(data, "年季").slice(0, 8);
 
   const rows = sorted.map(d => {
     const rev = d['營業收入淨額'];

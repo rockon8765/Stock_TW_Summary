@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clearQueryCacheForTests, queryTable } from "../js/api.js";
+import {
+  clearQueryCacheForTests,
+  fetchQuarterlyIncome,
+  queryTable,
+} from "../js/api.js";
 
 function makeSuccessResponse(payload) {
   return {
@@ -96,4 +100,27 @@ test("queryTable shares in-flight requests for the same table and params", async
     global.fetch = originalFetch;
     clearQueryCacheForTests();
   }
+});
+
+test("fetchQuarterlyIncome requests page_size=14 for 6-period rule alerts", async () => {
+  clearQueryCacheForTests();
+
+  let requestedUrl = "";
+  const originalFetch = global.fetch;
+  global.fetch = async (url) => {
+    requestedUrl = String(url);
+    return makeSuccessResponse({ data: [] });
+  };
+
+  try {
+    await fetchQuarterlyIncome("2330");
+  } finally {
+    global.fetch = originalFetch;
+    clearQueryCacheForTests();
+  }
+
+  const url = new URL(requestedUrl);
+  assert.match(url.pathname, /md_cm_fi_is_quarterly\/query$/);
+  assert.equal(url.searchParams.get("ticker"), "2330");
+  assert.equal(url.searchParams.get("page_size"), "14");
 });

@@ -4,232 +4,421 @@
  * 這組規則只服務網頁上的「即時規則警示（Live API）」區塊，
  * 直接從 Dottdot API 已 fetch 的資料計算，不承諾與 ScoreCard export
  * 或 Python pipeline 的 snapshot 完全一致。
- *
- * 每條 rule 回傳 boolean（true = triggered / 警示）。
  */
 import { sortAscByKey, sortDescByKey } from "../utils.js";
+
+const PERIOD_COUNT = 6;
+const EMPTY_LABEL = "—";
+
+function naCell(label = EMPTY_LABEL, reason = "資料不足") {
+  return { label, triggered: null, detail: reason };
+}
+
+function emptyPeriods() {
+  return Array.from({ length: PERIOD_COUNT }, () => naCell());
+}
+
+function formatYM(yyyymm) {
+  const text = String(yyyymm ?? "");
+  if (text.length < 6) return EMPTY_LABEL;
+  return `${text.slice(0, 4)}-${text.slice(4, 6)}`;
+}
+
+function parseYQ(yyyyq) {
+  const text = String(yyyyq ?? "");
+  if (text.length < 6) return null;
+  const year = Number(text.slice(0, 4));
+  const quarter = Number(text.slice(4, 6));
+  if (!Number.isInteger(year) || !Number.isInteger(quarter)) return null;
+  if (quarter < 1 || quarter > 4) return null;
+  return { year, quarter };
+}
+
+function formatYQ(yyyyq) {
+  const parsed = parseYQ(yyyyq);
+  return parsed ? `${parsed.year}Q${parsed.quarter}` : EMPTY_LABEL;
+}
+
+function computeYoy(cur, prev) {
+  if (!Number.isFinite(cur) || !Number.isFinite(prev) || prev === 0)
+    return null;
+  return ((cur - prev) / Math.abs(prev)) * 100;
+}
+
+function formatPct(value) {
+  return Number.isFinite(value) ? `${value.toFixed(1)}%` : "N/A";
+}
+
+function formatValue(value, decimals = 2) {
+  return Number.isFinite(value) ? value.toFixed(decimals) : "N/A";
+}
+
+function padOldestFirst(cells) {
+  const out = cells.slice(-PERIOD_COUNT);
+  while (out.length < PERIOD_COUNT) out.unshift(naCell());
+  return out;
+}
+
+function monthEndRows(quotes, dateKey = "日期") {
+  if (!Array.isArray(quotes) || quotes.length === 0) return [];
+  const byMonth = new Map();
+  for (const row of sortAscByKey(quotes, dateKey)) {
+    const date = String(row?.[dateKey] ?? "");
+    if (!date) continue;
+    byMonth.set(date.slice(0, 7), row);
+  }
+  return [...byMonth.entries()].map(([label, row]) => ({ label, row }));
+}
+
+function lastRowOnOrBefore(rows, dateKey, cutoff) {
+  let latest = null;
+  for (const row of sortAscByKey(rows, dateKey)) {
+    const date = String(row?.[dateKey] ?? "");
+    if (!date || date > cutoff) continue;
+    latest = row;
+  }
+  return latest;
+}
 
 /**
  * S10：累積營收連續三個月YOY衰退10%
  * 資料：monthsales 的 `累計合併營收成長` 欄位（百分比）
- * 觸發：最近 3 個月的 累計合併營收成長 都 < -10
  */
 function checkS10(monthsales) {
-  if (!monthsales || monthsales.length < 3) return false;
   const sorted = sortDescByKey(monthsales, "年月");
-  for (let i = 0; i < 3; i++) {
-    const v = Number(sorted[i]?.["累計合併營收成長"]);
-    if (!Number.isFinite(v) || v >= -10) return false;
+  const periods = emptyPeriods();
+
+  for (let i = 0; i < PERIOD_COUNT; i++) {
+    const anchor = sorted[i];
+    const label = anchor ? formatYM(anchor["年月"]) : EMPTY_LABEL;
+    const rows = sorted.slice(i, i + 3);
+    if (!anchor || rows.length < 3) {
+      periods[PERIOD_COUNT - 1 - i] = naCell(label);
+      continue;
+    }
+
+    const values = rows.map((row) => Number(row?.["累計合併營收成長"]));
+    if (values.some((value) => !Number.isFinite(value))) {
+      periods[PERIOD_COUNT - 1 - i] = naCell(label, "累計營收年增率資料不足");
+      continue;
+    }
+
+    periods[PERIOD_COUNT - 1 - i] = {
+      label,
+      triggered: values.every((value) => value < -10),
+      detail: values.map(formatPct).join(", "),
+    };
   }
-  return true;
+
+  return periods;
+}
+
+function checkQuarterlyYOYDeclineSeries(incomeQ, field, thresholdPct) {
+  const sorted = sortDescByKey(incomeQ, "年季");
+  const periods = emptyPeriods();
+
+  for (let i = 0; i < PERIOD_COUNT; i++) {
+    const anchor = sorted[i];
+    const label = anchor ? formatYQ(anchor["年季"]) : EMPTY_LABEL;
+    const current = Number(sorted[i]?.[field]);
+    const currentYearAgo = Number(sorted[i + 4]?.[field]);
+    const previous = Number(sorted[i + 1]?.[field]);
+    const previousYearAgo = Number(sorted[i + 5]?.[field]);
+    const currentYoy = computeYoy(current, currentYearAgo);
+    const previousYoy = computeYoy(previous, previousYearAgo);
+
+    if (!anchor || currentYoy == null || previousYoy == null) {
+      periods[PERIOD_COUNT - 1 - i] = naCell(label, `${field} YOY lookback 不足`);
+      continue;
+    }
+
+    periods[PERIOD_COUNT - 1 - i] = {
+      label,
+      triggered: currentYoy < thresholdPct && previousYoy < thresholdPct,
+      detail: `當季 ${formatPct(currentYoy)}, 前季 ${formatPct(previousYoy)}`,
+    };
+  }
+
+  return periods;
 }
 
 /**
  * S11：連續兩季單季稅後淨利YOY衰退5%
- * 資料：is_quarterly 的 `稅後純益`
- * 觸發：最近 2 季各自與去年同季比較，YOY 都 < -5%
  */
 function checkS11(incomeQ) {
-  return checkQuarterlyYOYDecline(incomeQ, "稅後純益", -5, 2);
+  return checkQuarterlyYOYDeclineSeries(incomeQ, "稅後純益", -5);
 }
 
 /**
  * S12：連續兩季單季營業利益YOY衰退5%
  */
 function checkS12(incomeQ) {
-  return checkQuarterlyYOYDecline(incomeQ, "營業利益", -5, 2);
+  return checkQuarterlyYOYDeclineSeries(incomeQ, "營業利益", -5);
 }
 
-/**
- * 共用：檢查最近 N 季的 YOY 是否都低於 threshold%
- * 需要至少 N+4 季的資料（最近 N 季各需與 4 季前比較）
- */
-function checkQuarterlyYOYDecline(incomeQ, field, thresholdPct, consecutive) {
-  if (!incomeQ || incomeQ.length < consecutive + 4) return false;
-  const sorted = sortDescByKey(incomeQ, "年季");
-  for (let i = 0; i < consecutive; i++) {
-    const current = Number(sorted[i]?.[field]);
-    const yearAgo = Number(sorted[i + 4]?.[field]);
-    if (!Number.isFinite(current) || !Number.isFinite(yearAgo) || yearAgo === 0)
-      return false;
-    const yoy = ((current - yearAgo) / Math.abs(yearAgo)) * 100;
-    if (yoy >= thresholdPct) return false;
+function sumYtdByQuarter(rows, year, quarter, field) {
+  let sum = 0;
+  for (let q = 1; q <= quarter; q++) {
+    const row = rows.find((candidate) => {
+      const parsed = parseYQ(candidate?.["年季"]);
+      return parsed?.year === year && parsed.quarter === q;
+    });
+    const value = Number(row?.[field]);
+    if (!row || !Number.isFinite(value)) return null;
+    sum += value;
   }
-  return true;
+  return sum;
 }
 
 /**
  * S13：今年以來稅後獲利衰退YOY達10%
- * 資料：is_quarterly 的 `稅後純益`
- * 觸發：今年 YTD 稅後純益合計 vs 去年同期 YTD 合計，衰退 >= 10%
  */
 function checkS13(incomeQ) {
-  if (!incomeQ || incomeQ.length < 5) return false;
   const sorted = sortDescByKey(incomeQ, "年季");
+  const periods = emptyPeriods();
 
-  // 最新季的年份
-  const latestYQ = String(sorted[0]?.["年季"] ?? "");
-  const latestYear = latestYQ.slice(0, 4);
-  const lastYear = String(Number(latestYear) - 1);
-
-  // 今年累計
-  let ytdCurrent = 0;
-  let ytdCount = 0;
-  for (const r of sorted) {
-    if (String(r["年季"]).startsWith(latestYear)) {
-      ytdCurrent += Number(r["稅後純益"]) || 0;
-      ytdCount++;
+  for (let i = 0; i < PERIOD_COUNT; i++) {
+    const anchor = sorted[i];
+    const parsed = parseYQ(anchor?.["年季"]);
+    const label = anchor ? formatYQ(anchor["年季"]) : EMPTY_LABEL;
+    if (!anchor || !parsed) {
+      periods[PERIOD_COUNT - 1 - i] = naCell(label);
+      continue;
     }
-  }
-  if (ytdCount === 0) return false;
 
-  // 去年同期累計（相同季數）
-  let ytdPrev = 0;
-  let prevCount = 0;
-  for (const r of sorted) {
-    if (String(r["年季"]).startsWith(lastYear) && prevCount < ytdCount) {
-      ytdPrev += Number(r["稅後純益"]) || 0;
-      prevCount++;
+    const currentYtd = sumYtdByQuarter(
+      sorted,
+      parsed.year,
+      parsed.quarter,
+      "稅後純益",
+    );
+    const previousYtd = sumYtdByQuarter(
+      sorted,
+      parsed.year - 1,
+      parsed.quarter,
+      "稅後純益",
+    );
+    const yoy = computeYoy(currentYtd, previousYtd);
+
+    if (yoy == null) {
+      periods[PERIOD_COUNT - 1 - i] = naCell(label, "YTD 稅後純益 lookback 不足");
+      continue;
     }
-  }
-  if (prevCount === 0 || ytdPrev === 0) return false;
 
-  const yoy = ((ytdCurrent - ytdPrev) / Math.abs(ytdPrev)) * 100;
-  return yoy < -10;
+    periods[PERIOD_COUNT - 1 - i] = {
+      label,
+      triggered: yoy < -10,
+      detail: `YTD ${formatPct(yoy)}`,
+    };
+  }
+
+  return periods;
 }
 
 /**
  * S17：PB百分位大於80%
- * 資料：dailyquotes 的 `股價淨值比`（5Y 日頻）
- * 觸發：當前 PB 在過去 5 年歷史分布中排在 80% 以上
  */
 function checkS17(quotes) {
-  if (!quotes || quotes.length < 250) return false;
-
-  const pbValues = quotes
-    .map((r) => Number(r["股價淨值比"]))
-    .filter((v) => Number.isFinite(v) && v > 0);
-  if (pbValues.length < 250) return false;
-
-  // 找升冪排序最新一天的 PB
   const sortedAsc = sortAscByKey(quotes, "日期");
-  const latestPB = Number(sortedAsc[sortedAsc.length - 1]?.["股價淨值比"]);
-  if (!Number.isFinite(latestPB) || latestPB <= 0) return false;
+  const cells = monthEndRows(sortedAsc)
+    .slice(-PERIOD_COUNT)
+    .map(({ label, row }) => {
+      const cutoff = String(row?.["日期"] ?? "");
+      const prefix = `cutoff ${cutoff};`;
+      const window = sortedAsc.filter((candidate) => {
+        const date = String(candidate?.["日期"] ?? "");
+        return date && date <= cutoff;
+      });
+      const pbValues = window
+        .map((candidate) => Number(candidate?.["股價淨值比"]))
+        .filter((value) => Number.isFinite(value) && value > 0);
+      const pb = Number(row?.["股價淨值比"]);
 
-  const sorted = [...pbValues].sort((a, b) => a - b);
-  const rank = sorted.filter((v) => v <= latestPB).length;
-  const percentile = rank / sorted.length;
-  return percentile > 0.8;
+      if (pbValues.length < 250)
+        return naCell(label, `${prefix} 歷史 PB 樣本不足`);
+      if (!Number.isFinite(pb) || pb <= 0)
+        return naCell(label, `${prefix} PB 資料不足`);
+
+      const sortedPb = [...pbValues].sort((left, right) => left - right);
+      const rank = sortedPb.filter((value) => value <= pb).length;
+      const percentile = rank / sortedPb.length;
+      return {
+        label,
+        triggered: percentile > 0.8,
+        detail: `${prefix} PB ${formatValue(pb)}, 百分位 ${formatPct(percentile * 100)}`,
+      };
+    });
+
+  return padOldestFirst(cells);
 }
 
 /**
- * S20：單季營收連兩季衰退（實作用月營收 YOY < 0 連續 2 個月）
- * 資料：monthsales 的 `單月合併營收年成長`（百分比）
- * 觸發：最近 2 個月的 單月合併營收年成長 都 < 0
- *
- * 備註：規則名稱寫「季」，但這裡仍以近兩個月的月營收 YOY 作為 live alert 的近似條件。
+ * S20：單月營收年增率連兩月衰退
  */
 function checkS20(monthsales) {
-  if (!monthsales || monthsales.length < 2) return false;
   const sorted = sortDescByKey(monthsales, "年月");
-  for (let i = 0; i < 2; i++) {
-    const v = Number(sorted[i]?.["單月合併營收年成長"]);
-    if (!Number.isFinite(v) || v >= 0) return false;
+  const periods = emptyPeriods();
+
+  for (let i = 0; i < PERIOD_COUNT; i++) {
+    const anchor = sorted[i];
+    const label = anchor ? formatYM(anchor["年月"]) : EMPTY_LABEL;
+    const rows = sorted.slice(i, i + 2);
+    if (!anchor || rows.length < 2) {
+      periods[PERIOD_COUNT - 1 - i] = naCell(label);
+      continue;
+    }
+
+    const values = rows.map((row) => Number(row?.["單月合併營收年成長"]));
+    if (values.some((value) => !Number.isFinite(value))) {
+      periods[PERIOD_COUNT - 1 - i] = naCell(label, "單月營收年增率資料不足");
+      continue;
+    }
+
+    periods[PERIOD_COUNT - 1 - i] = {
+      label,
+      triggered: values.every((value) => value < 0),
+      detail: values.map(formatPct).join(", "),
+    };
   }
-  return true;
+
+  return periods;
 }
 
 /**
  * S22：股票跌破年線且比大盤弱10%
- * 資料：dailyquotes 的 `收盤價`（計算 250MA）+ dailystatistics 的 `Alpha250D`
- * 觸發：收盤價 < 250日均線 AND Alpha250D < -0.10
- *
- * 備註：Live API 沒有直接提供 ScoreCard pipeline 使用的
- * `與大盤比年報酬率(%)`，前端改用 Alpha250D 作為即時近似訊號。
  */
 function checkS22(quotes, stats) {
-  if (!quotes || quotes.length < 250) return false;
-
-  // 計算 250 日均線
   const sortedAsc = sortAscByKey(quotes, "日期");
-  const closes = sortedAsc
-    .map((r) => Number(r["收盤價"]))
-    .filter(Number.isFinite);
-  if (closes.length < 250) return false;
+  const sortedStats = sortAscByKey(stats, "日期");
+  const cells = monthEndRows(sortedAsc)
+    .slice(-PERIOD_COUNT)
+    .map(({ label, row }) => {
+      const cutoff = String(row?.["日期"] ?? "");
+      const prefix = `cutoff ${cutoff};`;
+      const quoteWindow = sortedAsc.filter((candidate) => {
+        const date = String(candidate?.["日期"] ?? "");
+        return date && date <= cutoff;
+      });
+      const closeRows = quoteWindow.filter((candidate) =>
+        Number.isFinite(Number(candidate?.["收盤價"])),
+      );
+      const latestClose = Number(row?.["收盤價"]);
+      if (closeRows.length < 250)
+        return naCell(label, `${prefix} 250 日收盤價樣本不足`);
+      if (!Number.isFinite(latestClose))
+        return naCell(label, `${prefix} 收盤價資料不足`);
 
-  const recent250 = closes.slice(-250);
-  const ma250 = recent250.reduce((s, v) => s + v, 0) / 250;
-  const latestClose = closes[closes.length - 1];
+      const recent250 = closeRows.slice(-250).map((candidate) =>
+        Number(candidate["收盤價"]),
+      );
+      const ma250 = recent250.reduce((sum, value) => sum + value, 0) / 250;
+      const stat = lastRowOnOrBefore(sortedStats, "日期", cutoff);
+      const alpha = Number(stat?.["Alpha250D"]);
+      if (!stat || !Number.isFinite(alpha))
+        return naCell(label, `${prefix} Alpha250D 資料不足`);
 
-  const belowMA = latestClose < ma250;
+      return {
+        label,
+        triggered: latestClose < ma250 && alpha < -0.1,
+        detail:
+          `${prefix} close ${formatValue(latestClose)}, ` +
+          `MA250 ${formatValue(ma250)}, Alpha250D ${formatValue(alpha, 4)}`,
+      };
+    });
 
-  // Alpha250D 檢查
-  if (!stats || stats.length === 0) return false;
-  const sortedStats = sortDescByKey(stats, "日期");
-  const alpha = Number(sortedStats[0]?.["Alpha250D"]);
-  const underperform = Number.isFinite(alpha) && alpha < -0.1;
-
-  return belowMA && underperform;
+  return padOldestFirst(cells);
 }
 
 /**
- * 主入口：計算 7 條 sell rules 的觸發狀態。
+ * 主入口：計算 7 條 sell rules 的近 6 期觸發狀態。
  *
  * @param {Object} params
  * @param {Array<Object>|null} params.monthsales md_cm_fi_monthsales（12 月）
- * @param {Array<Object>|null} params.incomeQ     md_cm_fi_is_quarterly（8Q）
+ * @param {Array<Object>|null} params.incomeQ     md_cm_fi_is_quarterly（14Q）
  * @param {Array<Object>|null} params.quotes      md_cm_ta_dailyquotes（5Y 日頻）
  * @param {Array<Object>|null} params.stats       md_cm_ta_dailystatistics（5Y 日頻）
- * @returns {{ rules: Array<{code: string, name: string, triggered: boolean}>, alertCount: number }}
+ * @returns {{ rules: Array<{code: string, name: string, frequency: string, detail: string, periods: Array<{label: string, triggered: boolean|null, detail: string}>, latest: object, triggered: boolean}>, alertCount: number, latestAlertCount: number, latestAvailableCount: number, latestNaCount: number }}
  */
-export function computeRuleAlerts({ monthsales, incomeQ, quotes, stats }) {
+export function computeRuleAlerts({
+  monthsales,
+  incomeQ,
+  quotes,
+  stats,
+} = {}) {
   const rules = [
     {
       code: "S10",
       name: "累積營收連續三個月YOY衰退10%",
-      triggered: checkS10(monthsales),
+      frequency: "monthly",
       detail: "",
+      periods: checkS10(monthsales),
     },
     {
       code: "S11",
       name: "連續兩季單季稅後淨利YOY衰退5%",
-      triggered: checkS11(incomeQ),
+      frequency: "quarterly",
       detail: "",
+      periods: checkS11(incomeQ),
     },
     {
       code: "S12",
       name: "連續兩季單季營業利益YOY衰退5%",
-      triggered: checkS12(incomeQ),
+      frequency: "quarterly",
       detail: "",
+      periods: checkS12(incomeQ),
     },
     {
       code: "S13",
       name: "今年以來稅後獲利衰退YOY達10%",
-      triggered: checkS13(incomeQ),
+      frequency: "quarterly",
       detail: "",
+      periods: checkS13(incomeQ),
     },
     {
       code: "S20",
       name: "單月營收年增率連兩月衰退",
-      triggered: checkS20(monthsales),
+      frequency: "monthly",
       detail:
         "Live API 直接檢查最近 2 個月的單月營收年增率，不是 ScoreCard 的季資料規則。",
+      periods: checkS20(monthsales),
     },
     {
       code: "S22",
       name: "跌破年線且 Alpha250D < -10%（即時近似）",
-      triggered: checkS22(quotes, stats),
+      frequency: "monthEndDaily",
       detail:
         "Live API 以 Alpha250D 近似 ScoreCard 的「與大盤比年報酬率」訊號，前端與快照可能不同步。",
+      periods: checkS22(quotes, stats),
     },
     {
       code: "S17",
       name: "PB百分位大於80%",
-      triggered: checkS17(quotes),
+      frequency: "monthEndDaily",
       detail: "",
+      periods: checkS17(quotes),
     },
-  ];
+  ].map((rule) => {
+    const periods = padOldestFirst(rule.periods ?? []);
+    const latest = periods[PERIOD_COUNT - 1] ?? null;
+    return {
+      ...rule,
+      periods,
+      latest,
+      triggered: latest?.triggered === true,
+    };
+  });
 
-  const alertCount = rules.filter((r) => r.triggered).length;
-  return { rules, alertCount };
+  const latestAlertCount = rules.filter((rule) => rule.triggered).length;
+  const latestAvailableCount = rules.filter(
+    (rule) => rule.latest != null && rule.latest.triggered !== null,
+  ).length;
+  const latestNaCount = rules.length - latestAvailableCount;
+
+  return {
+    rules,
+    alertCount: latestAlertCount,
+    latestAlertCount,
+    latestAvailableCount,
+    latestNaCount,
+  };
 }
