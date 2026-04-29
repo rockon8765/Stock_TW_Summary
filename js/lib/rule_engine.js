@@ -7,13 +7,7 @@
  *
  * 每條 rule 回傳 boolean（true = triggered / 警示）。
  */
-
-/** 由新到舊排序 helper */
-function sortDesc(arr, key) {
-  return [...(arr || [])].sort((a, b) =>
-    String(b[key]).localeCompare(String(a[key])),
-  );
-}
+import { sortAscByKey, sortDescByKey } from "../utils.js";
 
 /**
  * S10：累積營收連續三個月YOY衰退10%
@@ -22,7 +16,7 @@ function sortDesc(arr, key) {
  */
 function checkS10(monthsales) {
   if (!monthsales || monthsales.length < 3) return false;
-  const sorted = sortDesc(monthsales, "年月");
+  const sorted = sortDescByKey(monthsales, "年月");
   for (let i = 0; i < 3; i++) {
     const v = Number(sorted[i]?.["累計合併營收成長"]);
     if (!Number.isFinite(v) || v >= -10) return false;
@@ -52,7 +46,7 @@ function checkS12(incomeQ) {
  */
 function checkQuarterlyYOYDecline(incomeQ, field, thresholdPct, consecutive) {
   if (!incomeQ || incomeQ.length < consecutive + 4) return false;
-  const sorted = sortDesc(incomeQ, "年季");
+  const sorted = sortDescByKey(incomeQ, "年季");
   for (let i = 0; i < consecutive; i++) {
     const current = Number(sorted[i]?.[field]);
     const yearAgo = Number(sorted[i + 4]?.[field]);
@@ -71,7 +65,7 @@ function checkQuarterlyYOYDecline(incomeQ, field, thresholdPct, consecutive) {
  */
 function checkS13(incomeQ) {
   if (!incomeQ || incomeQ.length < 5) return false;
-  const sorted = sortDesc(incomeQ, "年季");
+  const sorted = sortDescByKey(incomeQ, "年季");
 
   // 最新季的年份
   const latestYQ = String(sorted[0]?.["年季"] ?? "");
@@ -117,11 +111,8 @@ function checkS17(quotes) {
     .filter((v) => Number.isFinite(v) && v > 0);
   if (pbValues.length < 250) return false;
 
-  const currentPB = pbValues[pbValues.length - 1]; // 最新值（日期升冪排序的最後一筆）
   // 找升冪排序最新一天的 PB
-  const sortedAsc = [...quotes].sort((a, b) =>
-    String(a["日期"]).localeCompare(String(b["日期"])),
-  );
+  const sortedAsc = sortAscByKey(quotes, "日期");
   const latestPB = Number(sortedAsc[sortedAsc.length - 1]?.["股價淨值比"]);
   if (!Number.isFinite(latestPB) || latestPB <= 0) return false;
 
@@ -140,7 +131,7 @@ function checkS17(quotes) {
  */
 function checkS20(monthsales) {
   if (!monthsales || monthsales.length < 2) return false;
-  const sorted = sortDesc(monthsales, "年月");
+  const sorted = sortDescByKey(monthsales, "年月");
   for (let i = 0; i < 2; i++) {
     const v = Number(sorted[i]?.["單月合併營收年成長"]);
     if (!Number.isFinite(v) || v >= 0) return false;
@@ -160,9 +151,7 @@ function checkS22(quotes, stats) {
   if (!quotes || quotes.length < 250) return false;
 
   // 計算 250 日均線
-  const sortedAsc = [...quotes].sort((a, b) =>
-    String(a["日期"]).localeCompare(String(b["日期"])),
-  );
+  const sortedAsc = sortAscByKey(quotes, "日期");
   const closes = sortedAsc
     .map((r) => Number(r["收盤價"]))
     .filter(Number.isFinite);
@@ -176,9 +165,7 @@ function checkS22(quotes, stats) {
 
   // Alpha250D 檢查
   if (!stats || stats.length === 0) return false;
-  const sortedStats = [...stats].sort((a, b) =>
-    String(b["日期"]).localeCompare(String(a["日期"])),
-  );
+  const sortedStats = sortDescByKey(stats, "日期");
   const alpha = Number(sortedStats[0]?.["Alpha250D"]);
   const underperform = Number.isFinite(alpha) && alpha < -0.1;
 
@@ -201,36 +188,45 @@ export function computeRuleAlerts({ monthsales, incomeQ, quotes, stats }) {
       code: "S10",
       name: "累積營收連續三個月YOY衰退10%",
       triggered: checkS10(monthsales),
+      detail: "",
     },
     {
       code: "S11",
       name: "連續兩季單季稅後淨利YOY衰退5%",
       triggered: checkS11(incomeQ),
+      detail: "",
     },
     {
       code: "S12",
       name: "連續兩季單季營業利益YOY衰退5%",
       triggered: checkS12(incomeQ),
+      detail: "",
     },
     {
       code: "S13",
       name: "今年以來稅後獲利衰退YOY達10%",
       triggered: checkS13(incomeQ),
+      detail: "",
     },
     {
       code: "S20",
-      name: "單季營收連兩季衰退",
+      name: "單月營收年增率連兩月衰退",
       triggered: checkS20(monthsales),
+      detail:
+        "Live API 直接檢查最近 2 個月的單月營收年增率，不是 ScoreCard 的季資料規則。",
     },
     {
       code: "S22",
-      name: "股票跌破年線且比大盤弱10%",
+      name: "跌破年線且 Alpha250D < -10%（即時近似）",
       triggered: checkS22(quotes, stats),
+      detail:
+        "Live API 以 Alpha250D 近似 ScoreCard 的「與大盤比年報酬率」訊號，前端與快照可能不同步。",
     },
     {
       code: "S17",
       name: "PB百分位大於80%",
       triggered: checkS17(quotes),
+      detail: "",
     },
   ];
 

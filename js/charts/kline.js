@@ -1,3 +1,5 @@
+import { sortAscByKey } from "../utils.js";
+
 let chart = null;
 let candleSeries = null;
 let volumeSeries = null;
@@ -35,7 +37,7 @@ export function renderKline(data) {
   const getChartHeight = () => container.clientHeight || 360;
 
   // Sort by date ascending
-  allData = [...data].sort((a, b) => a["日期"].localeCompare(b["日期"]));
+  allData = sortAscByKey(data, "日期");
 
   // Create chart
   chart = LightweightCharts.createChart(container, {

@@ -1,18 +1,43 @@
 const BASE_URL = "https://data.dottdot.com/api/v1/tables";
 const API_KEY = "guest";
+const queryCache = new Map();
+
+function buildCacheKey(tableName, params = {}) {
+  const sortedParams = Object.entries(params)
+    .filter(([, value]) => value != null)
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+  return JSON.stringify([tableName, sortedParams]);
+}
+
+export function clearQueryCacheForTests() {
+  queryCache.clear();
+}
 
 export async function queryTable(tableName, params = {}, signal) {
-  const url = new URL(`${BASE_URL}/${tableName}/query`);
-  url.searchParams.set("api_key", API_KEY);
-  for (const [k, v] of Object.entries(params)) {
-    if (v != null) url.searchParams.set(k, v);
-  }
+  const cacheKey = buildCacheKey(tableName, params);
+  if (queryCache.has(cacheKey)) return queryCache.get(cacheKey);
 
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  const json = await res.json();
-  if (json.status !== "success") throw new Error(json.message || "API Error");
-  return json;
+  const request = (async () => {
+    const url = new URL(`${BASE_URL}/${tableName}/query`);
+    url.searchParams.set("api_key", API_KEY);
+    for (const [k, v] of Object.entries(params)) {
+      if (v != null) url.searchParams.set(k, v);
+    }
+
+    const res = await fetch(url, { signal });
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    const json = await res.json();
+    if (json.status !== "success") throw new Error(json.message || "API Error");
+    return json;
+  })();
+
+  queryCache.set(cacheKey, request);
+
+  try {
+    return await request;
+  } finally {
+    if (queryCache.get(cacheKey) === request) queryCache.delete(cacheKey);
+  }
 }
 
 function fiveYearsAgo() {

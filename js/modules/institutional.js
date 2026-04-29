@@ -1,4 +1,11 @@
-import { formatNumber, valClass, signStr, shortDate } from "../utils.js";
+import {
+  escapeHtml,
+  formatNumber,
+  shortDate,
+  signStr,
+  sortDescByKey,
+  valClass,
+} from "../utils.js";
 
 export function renderInstitutional(foreignData, trustData, brokerData) {
   const container = document.getElementById("institutional-table-container");
@@ -32,9 +39,7 @@ export function renderInstitutional(foreignData, trustData, brokerData) {
   }
 
   // Sort descending by date
-  const rows = Object.values(dateMap).sort((a, b) =>
-    String(b.date).localeCompare(String(a.date)),
-  );
+  const rows = sortDescByKey(Object.values(dateMap), "date");
 
   // Calculate cumulative totals
   const ascending = [...rows].reverse();
@@ -69,7 +74,7 @@ export function renderInstitutional(foreignData, trustData, brokerData) {
               Number(r.broker || 0);
             return `
           <tr>
-            <td>${shortDate(r.date)}</td>
+            <td>${escapeHtml(shortDate(r.date))}</td>
             <td class="${valClass(r.foreign)}">${r.foreign != null ? signStr(r.foreign) + formatNumber(r.foreign, 0) : "—"}</td>
             <td class="${valClass(r.trust)}">${r.trust != null ? signStr(r.trust) + formatNumber(r.trust, 0) : "—"}</td>
             <td class="${valClass(r.broker)}">${r.broker != null ? signStr(r.broker) + formatNumber(r.broker, 0) : "—"}</td>
@@ -100,7 +105,7 @@ function renderSummaryCards(foreignData, trustData, brokerData) {
         ${fLatest ? signStr(fLatest["外資買賣超"]) + formatNumber(fLatest["外資買賣超"], 0) + " 張" : "—"}
       </div>
       <div class="text-xs text-muted mt-2">
-        ${fLatest?.["外資持股比率"] != null ? `持股比率 ${fLatest["外資持股比率"]}%` : ""}
+        ${fLatest?.["外資持股比率"] != null ? `持股比率 ${escapeHtml(fLatest["外資持股比率"])}%` : ""}
       </div>
     </div>
 
@@ -110,7 +115,7 @@ function renderSummaryCards(foreignData, trustData, brokerData) {
         ${tLatest ? signStr(tLatest["投信買賣超"]) + formatNumber(tLatest["投信買賣超"], 0) + " 張" : "—"}
       </div>
       <div class="text-xs text-muted mt-2">
-        ${tLatest?.["投信持股比率"] != null ? `持股比率 ${tLatest["投信持股比率"]}%` : ""}
+        ${tLatest?.["投信持股比率"] != null ? `持股比率 ${escapeHtml(tLatest["投信持股比率"])}%` : ""}
       </div>
     </div>
 

@@ -1,4 +1,9 @@
-import { formatNumber } from "../utils.js";
+import {
+  escapeHtml,
+  formatNumber,
+  showNotApplicable,
+  sortAscByKey,
+} from "../utils.js";
 
 /**
  * 從日頻技術統計挑出最近 12 個月末的值（monthly snapshot）。
@@ -44,13 +49,11 @@ export function renderRiskTechnical(statsData) {
   if (!container) return;
 
   if (!Array.isArray(statsData) || statsData.length === 0) {
-    container.innerHTML = '<div class="section-error">無技術指標資料</div>';
+    showNotApplicable(container, "此標的暫無技術指標資料");
     return;
   }
 
-  const sortedAsc = [...statsData].sort((a, b) =>
-    String(a["日期"]).localeCompare(String(b["日期"])),
-  );
+  const sortedAsc = sortAscByKey(statsData, "日期");
   const latest = sortedAsc[sortedAsc.length - 1] || {};
   const monthEnds = pickMonthEnds(sortedAsc);
 
@@ -99,7 +102,7 @@ export function renderRiskTechnical(statsData) {
               const ym = String(r["日期"] ?? "").slice(0, 7);
               return `
                 <tr>
-                  <td>${ym}</td>
+                  <td>${escapeHtml(ym)}</td>
                   <td>${formatNumber(r["月K9"], 2)}</td>
                   <td>${formatNumber(r["月D9"], 2)}</td>
                   <td>${formatNumber(r["月RSI10"], 2)}</td>

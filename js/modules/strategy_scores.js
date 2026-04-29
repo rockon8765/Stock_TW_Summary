@@ -1,4 +1,4 @@
-import { formatNumber } from "../utils.js";
+import { escapeHtml, showError, showNotApplicable } from "../utils.js";
 
 let currentSort = { key: "score", dir: "desc" };
 
@@ -13,10 +13,14 @@ export function renderStrategyScores(strategySnapshot, ticker) {
   if (!el) return;
 
   if (!strategySnapshot) {
-    el.innerHTML = `
-      <div class="section-error">
-        策略分數快照未就緒（repo 根目錄缺少 <code>scorecard_web.json</code>）
-      </div>`;
+    showError(
+      el,
+      "策略分數快照未就緒（可能是網路失敗或缺少 scorecard_web.json）",
+      {
+        retrySection: "strategy-scores",
+        retryTicker: ticker,
+      },
+    );
     return;
   }
 
@@ -25,7 +29,7 @@ export function renderStrategyScores(strategySnapshot, ticker) {
   const strategiesMeta = strategySnapshot.strategies || [];
 
   if (Object.keys(scoresMap).length === 0) {
-    el.innerHTML = `<div class="section-error">此股未被任何策略評分</div>`;
+    showNotApplicable(el, "此股未被任何策略評分");
     return;
   }
 
@@ -79,19 +83,24 @@ function sortIndicator(key, curr) {
   return curr.dir === "asc" ? " ▲" : " ▼";
 }
 
+function ariaSortValue(key, curr) {
+  if (curr.key !== key) return "none";
+  return curr.dir === "asc" ? "ascending" : "descending";
+}
+
 function renderTable(el, rows, asOf) {
   const curr = currentSort;
   el.innerHTML = `
     <div class="strategy-scores-header">
-      <span class="muted">as of ${asOf || "—"}，共 ${rows.length} 檔策略有分數</span>
+      <span class="muted">as of ${escapeHtml(asOf || "—")}，共 ${rows.length} 檔策略有分數</span>
     </div>
     <div class="overflow-x-auto">
       <table class="data-table strategy-scores-table">
         <thead>
           <tr>
-            <th data-sort-key="name" class="cursor-pointer">策略${sortIndicator("name", curr)}</th>
-            <th data-sort-key="score" class="cursor-pointer">分數${sortIndicator("score", curr)}</th>
-            <th data-sort-key="latest_date" class="cursor-pointer">資料新鮮度${sortIndicator("latest_date", curr)}</th>
+            <th scope="col" data-sort-key="name" class="cursor-pointer" aria-sort="${ariaSortValue("name", curr)}">策略${sortIndicator("name", curr)}</th>
+            <th scope="col" data-sort-key="score" class="cursor-pointer" aria-sort="${ariaSortValue("score", curr)}">分數${sortIndicator("score", curr)}</th>
+            <th scope="col" data-sort-key="latest_date" class="cursor-pointer" aria-sort="${ariaSortValue("latest_date", curr)}">資料新鮮度${sortIndicator("latest_date", curr)}</th>
           </tr>
         </thead>
         <tbody>
@@ -105,9 +114,9 @@ function renderTable(el, rows, asOf) {
                 : `<span class="fresh-badge">最新 ${r.latest_date}</span>`;
               return `
                 <tr class="${staleClass}">
-                  <td class="mono">${r.name}</td>
+                  <td class="mono">${escapeHtml(r.name)}</td>
                   <td>${Math.round(r.score * 100)}</td>
-                  <td>${freshness}</td>
+                  <td>${r.is_stale ? `<span class="stale-badge">過時 ${escapeHtml(r.latest_date)}</span>` : `<span class="fresh-badge">最新 ${escapeHtml(r.latest_date)}</span>`}</td>
                 </tr>`;
             })
             .join("")}

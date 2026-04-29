@@ -1,3 +1,5 @@
+import { sortDescByKey } from "../utils.js";
+
 /**
  * 股利資料聚合器
  *
@@ -92,6 +94,5 @@ export function aggregateDividendsToAnnual(quarterlyData) {
   }
 
   // 由新到舊排序
-  result.sort((a, b) => b.年度.localeCompare(a.年度));
-  return result;
+  return sortDescByKey(result, "年度");
 }

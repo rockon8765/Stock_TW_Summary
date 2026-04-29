@@ -32,6 +32,16 @@ test("computeRuleAlerts returns all seven live rule codes", () => {
   assert.equal(result.alertCount, 0);
 });
 
+test("S20 and S22 labels explain live semantics instead of implying the old snapshot rules", () => {
+  const result = computeRuleAlerts({});
+  const s20 = result.rules.find((rule) => rule.code === "S20");
+  const s22 = result.rules.find((rule) => rule.code === "S22");
+
+  assert.match(s20.name, /單月/);
+  assert.match(s22.name, /近似|Alpha250D/);
+  assert.match(s22.detail, /ScoreCard|Alpha250D/);
+});
+
 test("S10 and S20 trigger from recent monthsales declines", () => {
   const result = computeRuleAlerts({
     monthsales: [

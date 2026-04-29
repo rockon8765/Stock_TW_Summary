@@ -1,4 +1,12 @@
-import { formatNumber, formatPercent, FIELD, safeDiv } from "../utils.js";
+import {
+  FIELD,
+  escapeHtml,
+  formatNumber,
+  formatPercent,
+  safeDiv,
+  showNotApplicable,
+  sortAscByKey,
+} from "../utils.js";
 
 /**
  * 從日 OHLCV 陣列中，找出每個年度的最後一個交易日收盤價。
@@ -9,9 +17,7 @@ function yearEndClosesFromQuotes(quotes) {
   const map = new Map();
   if (!Array.isArray(quotes)) return map;
   // 以日期升冪掃描；後覆蓋前 → 同年度最後進入的為該年度最後交易日
-  const sorted = [...quotes].sort((a, b) =>
-    String(a["日期"]).localeCompare(String(b["日期"])),
-  );
+  const sorted = sortAscByKey(quotes, "日期");
   for (const row of sorted) {
     const date = String(row?.["日期"] ?? "");
     if (date.length < 4) continue;
@@ -57,7 +63,7 @@ export function renderDividend({ annualDiv, quotes, annualIs }) {
   if (!container) return;
 
   if (!Array.isArray(annualDiv) || annualDiv.length === 0) {
-    container.innerHTML = '<div class="section-error">無股利發放資料</div>';
+    showNotApplicable(container, "此標的暫無股利發放資料");
     return;
   }
 
@@ -100,13 +106,13 @@ export function renderDividend({ annualDiv, quotes, annualIs }) {
 
             return `
               <tr>
-                <td>${d.年度}</td>
+                <td>${escapeHtml(d.年度)}</td>
                 <td>${formatNumber(d.年度現金股利, 2)}</td>
                 <td>${formatNumber(d.年度股票股利, 2)}</td>
                 <td>${formatNumber(d.年度股利合計, 2)}</td>
                 <td>${yieldCell}</td>
                 <td>${payoutCell}</td>
-                <td class="text-muted">${d.除息日 || "—"}</td>
+                <td class="text-muted">${escapeHtml(d.除息日 || "—")}</td>
               </tr>`;
           })
           .join("")}

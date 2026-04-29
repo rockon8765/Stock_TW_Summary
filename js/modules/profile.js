@@ -1,4 +1,12 @@
-import { formatNumber, formatPercent, valClass, signStr } from "../utils.js";
+import {
+  escapeHtml,
+  formatNumber,
+  formatPercent,
+  showNotApplicable,
+  signStr,
+  sortDescByKey,
+  valClassChange,
+} from "../utils.js";
 
 export function getLatestQuote(quotesData = []) {
   if (!Array.isArray(quotesData) || quotesData.length === 0) return null;
@@ -24,9 +32,7 @@ function metricCard(label, value, decimals, suffix = "") {
 
 function calcTrailing4qEPS(incomeData) {
   if (!incomeData?.length) return null;
-  const sorted = [...incomeData].sort((a, b) =>
-    String(b["年季"]).localeCompare(String(a["年季"])),
-  );
+  const sorted = sortDescByKey(incomeData, "年季");
   const recent4 = sorted.slice(0, 4);
   if (recent4.length < 4) return null;
   let sum = 0;
@@ -48,7 +54,7 @@ export function renderProfile(profileData, quotesData, bsData, incomeData) {
   const quote = getLatestQuote(quotesData);
 
   if (!profile && !quote) {
-    el.innerHTML = '<div class="section-error">無公司資料</div>';
+    showNotApplicable(el, "此標的暫無公司資料");
     return;
   }
 
@@ -74,30 +80,37 @@ export function renderProfile(profileData, quotesData, bsData, incomeData) {
   const latestBS = bsData?.[0];
   const bv = latestBS?.["每股淨值"];
   const eps4q = calcTrailing4qEPS(incomeData);
+  const safeTicker = escapeHtml(ticker);
+  const safeName = escapeHtml(name);
+  const safeFullName = escapeHtml(fullName);
+  const safeIndustry = escapeHtml(industry);
+  const safeChairman = escapeHtml(chairman);
+  const safeListDate = escapeHtml(listDate);
+  const safeDate = escapeHtml(date);
 
   el.innerHTML = `
     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
       <div>
         <div class="flex items-baseline gap-3 mb-1">
-          <span class="text-2xl font-bold">${ticker} ${name}</span>
-          <span class="text-sm text-muted">${industry}</span>
+          <span class="text-2xl font-bold">${safeTicker} ${safeName}</span>
+          <span class="text-sm text-muted">${safeIndustry}</span>
         </div>
         <div class="text-sm text-muted space-x-4">
-          ${fullName ? `<span>${fullName}</span>` : ""}
-          ${chairman ? `<span>董事長：${chairman}</span>` : ""}
+          ${fullName ? `<span>${safeFullName}</span>` : ""}
+          ${chairman ? `<span>董事長：${safeChairman}</span>` : ""}
           ${capital ? `<span>資本額：${formatNumber(capital / 1e2, 2)} 億</span>` : ""}
-          ${listDate ? `<span>上市：${listDate}</span>` : ""}
+          ${listDate ? `<span>上市：${safeListDate}</span>` : ""}
         </div>
       </div>
       ${
         close != null
           ? `
       <div class="text-right shrink-0">
-        <div class="text-3xl font-bold ${valClass(change)}">${formatNumber(close, 2)}</div>
-        <div class="text-sm ${valClass(change)}">
-          ${signStr(change)}${formatNumber(change, 2)}（${signStr(changeP)}${formatPercent(changeP)}）
+        <div class="text-3xl font-bold ${valClassChange(change)}">${formatNumber(close, 2, "收盤價")}</div>
+        <div class="text-sm ${valClassChange(change)}">
+          ${signStr(change)}${formatNumber(change, 2, "漲跌")}（${signStr(changeP)}${formatPercent(changeP, 2, "漲幅")}）
         </div>
-        <div class="text-xs text-muted mt-1">${date}</div>
+        <div class="text-xs text-muted mt-1">${safeDate}</div>
       </div>`
           : ""
       }

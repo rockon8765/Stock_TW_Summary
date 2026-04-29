@@ -1,31 +1,90 @@
-/** 千分位格式化 */
-export function formatNumber(n, decimals = 0) {
-  if (n == null || isNaN(n)) return "—";
-  return Number(n).toLocaleString("zh-TW", {
+function warnInvalidNumber(formatterName, fieldName, rawValue) {
+  console.warn(`[${formatterName}] malformed numeric input`, {
+    field: fieldName,
+    rawValue,
+  });
+}
+
+export function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function toFiniteNumber(rawValue, formatterName, fieldName = "value") {
+  const value = Number(rawValue);
+  if (!Number.isFinite(value)) {
+    warnInvalidNumber(formatterName, fieldName, rawValue);
+    return null;
+  }
+  return value;
+}
+
+function formatLocaleNumber(value, decimals = 0) {
+  return value.toLocaleString("zh-TW", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
 }
 
-/** 營收格式化（仟元 → 億元） */
-export function formatRevenue(n) {
-  if (n == null || isNaN(n)) return "—";
-  const v = Number(n);
-  if (Math.abs(v) >= 1e8) return (v / 1e8).toFixed(2) + " 億";
-  if (Math.abs(v) >= 1e4) return (v / 1e4).toFixed(2) + " 萬";
-  return formatNumber(v);
+function formatRevenueValue(value) {
+  if (Math.abs(value) >= 1e8) return `${formatLocaleNumber(value / 1e8, 2)} 億`;
+  if (Math.abs(value) >= 1e4) return `${formatLocaleNumber(value / 1e4, 2)} 萬`;
+  return formatLocaleNumber(value);
+}
+
+/** 千分位格式化 */
+export function formatNumber(n, decimals = 0, fieldName = "value") {
+  const value = toFiniteNumber(n, "formatNumber", fieldName);
+  if (value == null) return "—";
+  return formatLocaleNumber(value, decimals);
+}
+
+/** 營收格式化（元 → 億元 / 萬元） */
+export function formatRevenue(n, fieldName = "value") {
+  const value = toFiniteNumber(n, "formatRevenue", fieldName);
+  if (value == null) return "—";
+  return formatRevenueValue(value);
+}
+
+/** 仟元 → 億元 */
+export function valueFromThousandToYi(n, fieldName = "value") {
+  const value = toFiniteNumber(n, "valueFromThousandToYi", fieldName);
+  if (value == null) return null;
+  return value / 1e5;
+}
+
+/** 營收格式化（仟元 → 億元 / 萬元） */
+export function formatRevenueFromThousand(n, fieldName = "value") {
+  const value = toFiniteNumber(n, "formatRevenueFromThousand", fieldName);
+  if (value == null) return "—";
+  return formatRevenueValue(value * 1000);
 }
 
 /** 百分比格式化 */
-export function formatPercent(n, decimals = 2) {
-  if (n == null || isNaN(n)) return "—";
-  return Number(n).toFixed(decimals) + "%";
+export function formatPercent(n, decimals = 2, fieldName = "value") {
+  const value = toFiniteNumber(n, "formatPercent", fieldName);
+  if (value == null) return "—";
+  return value.toFixed(decimals) + "%";
 }
 
 /** 漲跌 CSS class */
-export function valClass(n) {
+export function valClassChange(n) {
   if (n == null || isNaN(n) || Number(n) === 0) return "val-neutral";
   return Number(n) > 0 ? "val-up" : "val-down";
+}
+
+/** 水位/等級型指標保持中性呈現，避免誤導成漲跌語意 */
+export function valClassLevel() {
+  return "val-neutral";
+}
+
+/** 向後相容：舊呼叫點預設仍走漲跌語意 */
+export function valClass(n) {
+  return valClassChange(n);
 }
 
 /** 漲跌符號 */
@@ -112,7 +171,73 @@ export function clearSection(el) {
   el.innerHTML = "";
 }
 
+export function sortDescByKey(rows, key) {
+  return [...(rows ?? [])].sort((left, right) =>
+    String(right?.[key] ?? "").localeCompare(String(left?.[key] ?? "")),
+  );
+}
+
+export function sortAscByKey(rows, key) {
+  return [...(rows ?? [])].sort((left, right) =>
+    String(left?.[key] ?? "").localeCompare(String(right?.[key] ?? "")),
+  );
+}
+
+export function sortDescByNumericKey(rows, key) {
+  return [...(rows ?? [])].sort(
+    (left, right) => Number(right?.[key] ?? Number.NEGATIVE_INFINITY) -
+      Number(left?.[key] ?? Number.NEGATIVE_INFINITY),
+  );
+}
+
+export function latestRowByKey(rows, key) {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  return rows.reduce((latest, current) => {
+    if (!latest?.[key]) return current;
+    if (!current?.[key]) return latest;
+    return String(current[key]).localeCompare(String(latest[key])) > 0
+      ? current
+      : latest;
+  }, null);
+}
+
+export function buildLoadingMarkup(label = "資料", options = {}) {
+  const containerClass = ["section-loading", options.containerClass]
+    .filter(Boolean)
+    .join(" ");
+  const contentHtml =
+    options.contentHtml ??
+    `<div class="${["skeleton", options.skeletonClass].filter(Boolean).join(" ")}"></div>`;
+
+  return `
+    <div class="${containerClass}" role="status" aria-live="polite">
+      <span class="sr-only">${escapeHtml(label)}載入中</span>
+      ${contentHtml}
+    </div>
+  `;
+}
+
+/** 顯示不適用/無資料訊息 */
+export function showNotApplicable(el, msg = "此資料暫不適用") {
+  el.innerHTML = `<div class="section-empty" role="status" aria-live="polite">${escapeHtml(msg)}</div>`;
+}
+
+export function resolveRetryTicker(retryTicker, fallbackTicker = "") {
+  return String(retryTicker ?? fallbackTicker ?? "").trim();
+}
+
 /** 顯示錯誤訊息 */
-export function showError(el, msg = "載入失敗") {
-  el.innerHTML = `<div class="section-error">${msg}</div>`;
+export function showError(el, msg = "載入失敗", options = {}) {
+  const retryButtonAttributes = [
+    `data-retry-section="${escapeHtml(options.retrySection)}"`,
+  ];
+  if (options.retryTicker) {
+    retryButtonAttributes.push(
+      `data-retry-ticker="${escapeHtml(options.retryTicker)}"`,
+    );
+  }
+  const retryButton = options.retrySection
+    ? `<button type="button" ${retryButtonAttributes.join(" ")}>${escapeHtml(options.retryLabel || "重試此區塊")}</button>`
+    : "";
+  el.innerHTML = `<div class="section-error" role="alert">${escapeHtml(msg)}${retryButton}</div>`;
 }

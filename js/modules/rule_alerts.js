@@ -8,9 +8,11 @@
 /**
  * 渲染規則警示 chip（Profile 區塊內、metric cards 下方）。
  *
- * @param {{ rules: Array<{code: string, name: string, triggered: boolean}>, alertCount: number }} ruleResult
+ * @param {{ rules: Array<{code: string, name: string, triggered: boolean, detail?: string}>, alertCount: number }} ruleResult
  *        由 rule_engine.js 的 computeRuleAlerts() 產生
  */
+import { escapeHtml } from "../utils.js";
+
 export function renderRuleAlerts(ruleResult) {
   const el = document.getElementById("rule-alerts-container");
   if (!el) return;
@@ -36,18 +38,20 @@ export function renderRuleAlerts(ruleResult) {
     .map((r) => {
       const cls = r.triggered ? "chip chip-triggered" : "chip chip-off";
       const dot = r.triggered ? "●" : "○";
-      return `<span class="${cls}">${dot} ${r.code} ${r.name}</span>`;
+      const title = escapeHtml(r.detail || r.name);
+      return `<span class="${cls}" title="${title}">${dot} ${escapeHtml(r.code)} ${escapeHtml(r.name)}</span>`;
     })
     .join("");
 
   el.innerHTML = `
     <div class="rule-alerts">
       <div class="rule-alerts-header">
-        <span class="rule-alerts-title">即時規則警示（Live API）</span>
+        <span class="rule-alerts-title">即時規則警示（Live API 近似訊號）</span>
         <span class="rule-alerts-summary">
           警示 <strong class="${countClass}">${alertCount}/${totalRules}</strong>
         </span>
       </div>
+      <div class="rule-alerts-summary">部分規則為前端即時近似訊號，可能與 ScoreCard 快照不同。</div>
       <div class="rule-chips">${chipsHtml}</div>
     </div>
   `;

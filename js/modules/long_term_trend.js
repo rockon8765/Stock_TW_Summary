@@ -1,4 +1,13 @@
-import { formatNumber, formatPercent, FIELD, safeDiv, cagr } from "../utils.js";
+import {
+  FIELD,
+  cagr,
+  formatNumber,
+  formatPercent,
+  safeDiv,
+  showNotApplicable,
+  sortDescByKey,
+  sortDescByNumericKey,
+} from "../utils.js";
 
 /**
  * 找 5Y CAGR 所需的 (end, start, years) 三元組：
@@ -61,15 +70,11 @@ export function renderLongTermTrend(annualIs, annualBs, annualDiv) {
   const container = document.getElementById("longterm-trend-container");
   if (!container) return;
 
-  const isDesc = [...(annualIs ?? [])].sort(
-    (a, b) => Number(b["年度"]) - Number(a["年度"]),
-  );
-  const bsDesc = [...(annualBs ?? [])].sort(
-    (a, b) => Number(b["年度"]) - Number(a["年度"]),
-  );
+  const isDesc = sortDescByKey(annualIs, "年度");
+  const bsDesc = sortDescByKey(annualBs, "年度");
 
   if (isDesc.length === 0 && bsDesc.length === 0) {
-    container.innerHTML = '<div class="section-error">無年度財報資料</div>';
+    showNotApplicable(container, "此標的暫無年度財報資料");
     return;
   }
 
@@ -82,9 +87,13 @@ export function renderLongTermTrend(annualIs, annualBs, annualDiv) {
   // 2. EPS CAGR
   const epsCagr = cagrFromPair(isDesc, FIELD.EPS);
   // 3. 現金股利 CAGR（用 annualDiv 年度現金股利）
-  const divSorted = [...(annualDiv ?? [])]
-    .map((d) => ({ 年度: Number(d.年度), value: d.年度現金股利 }))
-    .sort((a, b) => b.年度 - a.年度);
+  const divSorted = sortDescByNumericKey(
+    [...(annualDiv ?? [])].map((d) => ({
+      年度: Number(d.年度),
+      value: d.年度現金股利,
+    })),
+    "年度",
+  );
   let divCagr = null;
   if (divSorted.length > 0) {
     const endYear = divSorted[0].年度;
