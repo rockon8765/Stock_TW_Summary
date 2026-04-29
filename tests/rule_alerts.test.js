@@ -29,9 +29,9 @@ function makeRuleResult(overrides = {}) {
     }));
     return {
       code,
-      name: `Rule ${code}`,
+      name: `條件 ${ruleIndex + 1}`,
       frequency: ruleIndex % 3 === 0 ? "monthly" : ruleIndex % 3 === 1 ? "quarterly" : "monthEndDaily",
-      detail: `row detail ${code}`,
+      detail: `row detail ${ruleIndex + 1}`,
       periods,
       latest: periods[5],
       triggered: periods[5].triggered === true,
@@ -56,6 +56,8 @@ test("renderRuleAlerts produces a table with 7 rows and 6 dot cells per row", ()
     assert.equal((container.innerHTML.match(/<tr>/g) ?? []).length, 7);
     assert.equal((container.innerHTML.match(/class="dot dot-/g) ?? []).length, 42);
     assert.match(container.innerHTML, /本期警示 <strong class="val-warn">2\/7<\/strong>/);
+    assert.doesNotMatch(container.innerHTML, /class="rule-code"/);
+    assert.doesNotMatch(container.innerHTML, />S10</);
   });
 });
 

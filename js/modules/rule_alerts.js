@@ -79,7 +79,6 @@ function renderRuleRow(rule) {
     <tr>
       <th scope="row" title="${rowTitle}">
         <div class="rule-row-header">
-          <span class="rule-code">${escapeHtml(rule.code)}</span>
           <span class="rule-name">${escapeHtml(rule.name)}</span>
           ${frequencyLabel ? `<span class="rule-cat-badge">${escapeHtml(frequencyLabel)}</span>` : ""}
         </div>

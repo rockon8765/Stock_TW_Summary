@@ -394,12 +394,8 @@ html, body { background: var(--color-surface-900); }
   gap: 0.25rem 0.5rem;
 }
 
-.rule-code {
-  font-weight: 700;
-  color: var(--color-text-strong);
-}
-
 .rule-name {
+  font-weight: 700;
   color: var(--color-text-soft);
   font-size: 0.75rem;
   line-height: 1.25;

@@ -132,10 +132,14 @@ function summarizeCategory(category, bucket) {
   const total = bucket.all.length;
   const scoredCount = bucket.scored.length;
   const allStale = total > 0 && bucket.staleCount === total;
+  const displayCategory =
+    category === OTHER_CATEGORY && total === 1
+      ? bucket.all[0]?.name || category
+      : category;
 
   if (scoredCount === 0) {
     return {
-      category,
+      category: displayCategory,
       total,
       scoredCount,
       mean: null,
@@ -166,7 +170,7 @@ function summarizeCategory(category, bucket) {
   }
 
   return {
-    category,
+    category: displayCategory,
     total,
     scoredCount,
     mean: sum / scoredCount,
@@ -198,11 +202,11 @@ function renderTable(el, rows, asOf) {
       <table class="data-table strategy-scores-table">
         <thead>
           <tr>
-            <th scope="col" data-sort-key="category" class="cursor-pointer" aria-sort="${ariaSortValue("category", curr)}">類別${sortIndicator("category", curr)}</th>
-            <th scope="col" data-sort-key="mean" class="cursor-pointer" aria-sort="${ariaSortValue("mean", curr)}">平均${sortIndicator("mean", curr)}</th>
-            <th scope="col" data-sort-key="max" class="cursor-pointer" aria-sort="${ariaSortValue("max", curr)}">最高${sortIndicator("max", curr)}</th>
-            <th scope="col" data-sort-key="min" class="cursor-pointer" aria-sort="${ariaSortValue("min", curr)}">最低${sortIndicator("min", curr)}</th>
-            <th scope="col" data-sort-key="scoredCount" class="cursor-pointer" aria-sort="${ariaSortValue("scoredCount", curr)}">覆蓋${sortIndicator("scoredCount", curr)}</th>
+            <th scope="col" data-sort-key="category" class="cursor-pointer" aria-sort="${ariaSortValue("category", curr)}">策略類別${sortIndicator("category", curr)}</th>
+            <th scope="col" data-sort-key="mean" class="cursor-pointer" aria-sort="${ariaSortValue("mean", curr)}">平均分${sortIndicator("mean", curr)}</th>
+            <th scope="col" data-sort-key="max" class="cursor-pointer" aria-sort="${ariaSortValue("max", curr)}">最高分${sortIndicator("max", curr)}</th>
+            <th scope="col" data-sort-key="min" class="cursor-pointer" aria-sort="${ariaSortValue("min", curr)}">最低分${sortIndicator("min", curr)}</th>
+            <th scope="col" data-sort-key="scoredCount" class="cursor-pointer" aria-sort="${ariaSortValue("scoredCount", curr)}">覆蓋比例${sortIndicator("scoredCount", curr)}</th>
           </tr>
         </thead>
         <tbody>
