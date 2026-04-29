@@ -173,15 +173,23 @@ test("renderStrategyScores renders aggregate table when scoresMap is non-empty",
           strategies: [
             { name: "F14_A", latest_date: "2026-04-16", is_stale: false },
             { name: "F28_X", latest_date: "2026-04-16", is_stale: false },
+            { name: "Trading_EE1", latest_date: "2026-04-16", is_stale: false },
           ],
-          tickers: { "2330": { strategy_scores: { F14_A: 0.5 } } },
+          tickers: { "2330": { strategy_scores: { F14_A: 0.5, Trading_EE1: 0 } } },
         },
         "2330",
       );
 
       const { innerHTML } = elements["strategy-scores-container"];
       assert.match(innerHTML, /strategy-category-row/);
+      assert.match(innerHTML, /策略類別/);
+      assert.match(innerHTML, /平均分/);
+      assert.match(innerHTML, /最高分/);
+      assert.match(innerHTML, /最低分/);
+      assert.match(innerHTML, /覆蓋比例/);
       assert.match(innerHTML, /F28/);
+      assert.match(innerHTML, /Trading_EE1/);
+      assert.doesNotMatch(innerHTML, />其他</);
       assert.match(innerHTML, /—/);
     },
   );

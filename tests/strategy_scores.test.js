@@ -141,12 +141,21 @@ test("aggregateByCategory absorbs orphan scores into categories", () => {
 
   const out = aggregateByCategory(meta, scores);
   const f14 = out.find((c) => c.category === "F14");
-  const other = out.find((c) => c.category === "其他");
+  const other = out.find((c) => c.category === "Trading_Orphan");
 
   assert.equal(f14.total, 2);
   assert.equal(f14.scoredCount, 2);
   assert.equal(other.total, 1);
   assert.equal(other.scoredCount, 1);
+});
+
+test("aggregateByCategory labels singleton non-F category by strategy name", () => {
+  const meta = [{ name: "Trading_EE1", is_stale: false }];
+  const scores = { Trading_EE1: 0 };
+
+  const out = aggregateByCategory(meta, scores);
+
+  assert.deepEqual(out.map((c) => c.category), ["Trading_EE1"]);
 });
 
 test("aggregateByCategory ignores orphan with non-finite score", () => {
