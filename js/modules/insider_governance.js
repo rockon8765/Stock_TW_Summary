@@ -2,6 +2,7 @@ import {
   escapeHtml,
   formatNumber,
   formatPercent,
+  formatYearMonth,
   showNotApplicable,
   sortDescByKey,
 } from "../utils.js";
@@ -72,7 +73,7 @@ export function renderInsiderGovernance(insiderData) {
           .map(
             (r) => `
           <tr>
-            <td>${escapeHtml(r["年月"] ?? "")}</td>
+            <td>${escapeHtml(formatYearMonth(r["年月"]))}</td>
             <td>${formatPercent(r["董監持股比例"])}</td>
             <td>${changeCell(r["董監持股比例增減"])}</td>
             <td>${formatPercent(r["經理人持股比例"])}</td>

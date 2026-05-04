@@ -81,8 +81,8 @@ test("renderRevenue adds 3M rolling and 12M TTM YoY columns from monthly revenue
     assert.match(container.innerHTML, /<th>3M YoY%<\/th>/);
     assert.match(container.innerHTML, /<th>12M TTM YoY%<\/th>/);
     assert.match(container.innerHTML, /\+100\.00%/);
-    assert.match(container.innerHTML, /202603/);
-    assert.match(container.innerHTML, /202504/);
-    assert.doesNotMatch(container.innerHTML, /202503/);
+    assert.match(container.innerHTML, /2026-03/);
+    assert.match(container.innerHTML, /2025-04/);
+    assert.doesNotMatch(container.innerHTML, /2025-03/);
   });
 });

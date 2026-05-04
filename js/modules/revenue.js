@@ -2,6 +2,7 @@ import {
   escapeHtml,
   formatPercent,
   formatRevenueFromThousand,
+  formatYearMonth,
   showNotApplicable,
   safeDiv,
   signStr,
@@ -80,7 +81,7 @@ export function renderRevenue(data) {
             : null;
           return `
           <tr>
-            <td>${escapeHtml(d["年月"] || "")}</td>
+            <td>${escapeHtml(formatYearMonth(d["年月"]))}</td>
             <td>${formatRevenueFromThousand(d["單月合併營收"], "單月合併營收")}</td>
             <td class="${valClassChange(d["單月合併營收月變動"])}">${formatSignedPercent(d["單月合併營收月變動"], "單月合併營收月變動")}</td>
             <td class="${valClassChange(d["單月合併營收年成長"])}">${formatSignedPercent(d["單月合併營收年成長"], "單月合併營收年成長")}</td>
