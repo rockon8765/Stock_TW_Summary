@@ -64,10 +64,6 @@
           <div class="skeleton h-6 w-48 mb-3"></div>
           <div class="skeleton h-4 w-96"></div>
         </div>
-        <!-- 規則警示 chips（ScoreCard_V2_New 的 7 條 sell rules） -->
-        <div id="rule-alerts-container" class="mt-4 pt-4 border-t border-slate-700/50">
-          <div class="section-loading"><div class="skeleton h-12 w-full rounded-lg"></div></div>
-        </div>
       </section>
 
       <!-- Section 1.5 (MOVED): K 線圖（預設展開，緊接 Profile） -->
@@ -94,6 +90,24 @@
         </div>
       </section>
 
+      <!-- Section 1.6: 股票摘要（K 線後、規則警示前） -->
+      <section id="section-stock-summary" class="bg-card rounded-xl p-5 border border-slate-700/50">
+        <h2 class="text-lg font-semibold mb-4">股票摘要</h2>
+        <div id="stock-summary-content" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
+          <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
+          <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
+          <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
+        </div>
+      </section>
+
+      <!-- Section 1.7: 即時規則警示（Live API 近似訊號） -->
+      <section id="section-rule-alerts" class="bg-card rounded-xl p-5 border border-slate-700/50">
+        <div id="rule-alerts-container">
+          <div class="section-loading"><div class="skeleton h-12 w-full rounded-lg"></div></div>
+        </div>
+      </section>
+
       <!-- Section 1.8 (NEW): 策略買入分數（K 線後、估值前） -->
       <section id="section-strategy-scores" class="bg-card rounded-xl p-5 border border-slate-700/50">
         <h2 class="text-lg font-semibold mb-4">策略買入分數</h2>
@@ -102,10 +116,10 @@
         </div>
       </section>
 
-      <!-- Section 2: 估值趨勢表 | 股利發放歷史（兩欄並排） -->
+      <!-- Section 2: 季度財務（整併） | 股利發放歷史（兩欄並排） -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section id="section-valuation" class="bg-card rounded-xl p-5 border border-slate-700/50">
-          <h2 class="text-lg font-semibold mb-4">估值趨勢（近 8 季）</h2>
+          <h2 class="text-lg font-semibold mb-4">季度財務（近 8 季）</h2>
           <div id="valuation-table-container" class="overflow-x-auto">
             <div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>
           </div>
@@ -132,22 +146,13 @@
         </div>
       </section>
 
-      <!-- Section 3: 月營收 | 季度損益 -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <section id="section-revenue" class="bg-card rounded-xl p-5 border border-slate-700/50">
-          <h2 class="text-lg font-semibold mb-4">月營收（近 12 個月）</h2>
-          <div id="revenue-table-container" class="overflow-x-auto">
-            <div class="section-loading"><div class="skeleton h-40 w-full rounded-lg"></div></div>
-          </div>
-        </section>
-
-        <section id="section-income" class="bg-card rounded-xl p-5 border border-slate-700/50">
-          <h2 class="text-lg font-semibold mb-4">季度損益（近 8 季）</h2>
-          <div id="income-table-container" class="overflow-x-auto">
-            <div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>
-          </div>
-        </section>
-      </div>
+      <!-- Section 3: 月營收（季度損益已整併進「季度財務」區塊） -->
+      <section id="section-revenue" class="bg-card rounded-xl p-5 border border-slate-700/50">
+        <h2 class="text-lg font-semibold mb-4">月營收（近 12 個月）</h2>
+        <div id="revenue-table-container" class="overflow-x-auto">
+          <div class="section-loading"><div class="skeleton h-40 w-full rounded-lg"></div></div>
+        </div>
+      </section>
 
       <!-- Section 3.5 (NEW): 現金流摘要 | 5Y 長期趨勢 -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -170,13 +175,13 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section id="section-institutional" class="bg-card rounded-xl p-5 border border-slate-700/50">
           <h2 class="text-lg font-semibold mb-4">三大法人買賣超（近 30 日）</h2>
-          <div id="institutional-table-container" class="overflow-x-auto mb-4">
-            <div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>
+          <div id="institutional-cards" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
+            <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
+            <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
           </div>
-          <div id="institutional-cards" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
-            <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
-            <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
+          <div id="institutional-table-container" class="overflow-x-auto">
+            <div class="section-loading"><div class="skeleton h-64 w-full rounded-lg"></div></div>
           </div>
         </section>
 

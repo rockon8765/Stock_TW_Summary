@@ -79,7 +79,7 @@ export function fetchMonthSales(ticker, signal) {
     "md_cm_fi_monthsales",
     {
       ticker,
-      page_size: 12,
+      page_size: 24,
     },
     signal,
   );

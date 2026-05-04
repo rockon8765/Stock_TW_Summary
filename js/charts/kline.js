@@ -3,7 +3,9 @@ import { sortAscByKey } from "../utils.js";
 let chart = null;
 let candleSeries = null;
 let volumeSeries = null;
+let scoreOverlaySeries = null;
 let allData = [];
+let pendingScoreOverlay = [];
 let resizeObserver = null;
 
 function getRangeButtons() {
@@ -32,6 +34,7 @@ export function renderKline(data) {
     chart.remove();
     chart = null;
   }
+  scoreOverlaySeries = null;
 
   container.innerHTML = "";
   const getChartHeight = () => container.clientHeight || 360;
@@ -90,6 +93,8 @@ export function renderKline(data) {
   chart.priceScale("volume").applyOptions({
     scaleMargins: { top: 0.8, bottom: 0 },
   });
+  ensureScoreSeries();
+  applyScoreOverlayData(pendingScoreOverlay);
 
   setRange("5Y");
   bindRangeButtons();
@@ -99,6 +104,43 @@ export function renderKline(data) {
     chart.resize(container.clientWidth, getChartHeight());
   });
   resizeObserver.observe(container);
+}
+
+function ensureScoreSeries() {
+  if (!chart || scoreOverlaySeries) return;
+  const lineOptions = {
+    color: "#fbbf24",
+    lineWidth: 2,
+    priceScaleId: "score",
+    priceFormat: { type: "price", precision: 1, minMove: 0.1 },
+  };
+  if (LightweightCharts.LineSeries) {
+    scoreOverlaySeries = chart.addSeries(
+      LightweightCharts.LineSeries,
+      lineOptions,
+    );
+  } else if (chart.addLineSeries) {
+    scoreOverlaySeries = chart.addLineSeries(lineOptions);
+  }
+  if (!scoreOverlaySeries) return;
+  chart.priceScale("score").applyOptions({
+    scaleMargins: { top: 0.1, bottom: 0.7 },
+    mode: 1,
+  });
+}
+
+function applyScoreOverlayData(periodScores = []) {
+  pendingScoreOverlay = Array.isArray(periodScores) ? periodScores : [];
+  if (!scoreOverlaySeries) return;
+  const data = pendingScoreOverlay
+    .filter((point) => point?.score != null && point?.date)
+    .map((point) => ({ time: point.date, value: point.score }));
+  scoreOverlaySeries.setData(data);
+}
+
+export function setRuleScoreOverlay(periodScores) {
+  ensureScoreSeries();
+  applyScoreOverlayData(periodScores);
 }
 
 function setRange(range) {

@@ -3,3 +3,4 @@
 node_modules/
 .claude/
 .playwright-cli/
+.playwright-mcp/
