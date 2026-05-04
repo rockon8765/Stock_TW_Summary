@@ -8,6 +8,9 @@ import {
 } from "../utils.js";
 
 export function renderInstitutional(foreignData, trustData, brokerData) {
+  // Render summary cards above the table
+  renderSummaryCards(foreignData, trustData, brokerData);
+
   const container = document.getElementById("institutional-table-container");
   if (!container) return;
 
@@ -86,9 +89,6 @@ export function renderInstitutional(foreignData, trustData, brokerData) {
       </tbody>
     </table>
   `;
-
-  // Render summary cards below the table
-  renderSummaryCards(foreignData, trustData, brokerData);
 }
 
 function renderSummaryCards(foreignData, trustData, brokerData) {

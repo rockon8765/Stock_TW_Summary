@@ -19,9 +19,8 @@ import {
 import { renderProfile } from "./modules/profile.js";
 import { renderValuation } from "./modules/valuation.js";
 import { renderDividend } from "./modules/dividend.js";
-import { renderKline } from "./charts/kline.js";
+import { renderKline, setRuleScoreOverlay } from "./charts/kline.js";
 import { renderRevenue } from "./modules/revenue.js";
-import { renderIncome } from "./modules/income.js";
 import { renderInstitutional } from "./modules/institutional.js";
 import { renderShareholders } from "./modules/shareholders.js";
 import {
@@ -36,7 +35,12 @@ import { renderInsiderGovernance } from "./modules/insider_governance.js";
 import { renderLongTermTrend } from "./modules/long_term_trend.js";
 import { renderRuleAlerts } from "./modules/rule_alerts.js";
 import { renderStrategyScores } from "./modules/strategy_scores.js";
-import { computeRuleAlerts } from "./lib/rule_engine.js";
+import { renderStockSummary } from "./modules/stock_summary.js";
+import {
+  computeBuyScore,
+  computePeriodScores,
+  computeRuleAlerts,
+} from "./lib/rule_engine.js";
 import { aggregateDividendsToAnnual } from "./lib/dividend_aggregator.js";
 import {
   buildLoadingMarkup,
@@ -64,7 +68,6 @@ const busySectionIds = [
   "valuation-table-container",
   "dividend-table-container",
   "revenue-table-container",
-  "income-table-container",
   "institutional-table-container",
   "institutional-cards",
   "shareholders-table-container",
@@ -76,6 +79,7 @@ const busySectionIds = [
   "longterm-trend-container",
   "governance-table-container",
   "risk-tech-container",
+  "stock-summary-content",
   "rule-alerts-container",
   "strategy-scores-container",
 ];
@@ -155,7 +159,7 @@ function resetSections() {
       contentHtml:
         '<div class="skeleton h-6 w-48 mb-3"></div><div class="skeleton h-4 w-96"></div>',
     }),
-    "valuation-table-container": buildLoadingMarkup("估值趨勢", {
+    "valuation-table-container": buildLoadingMarkup("季度財務", {
       skeletonClass: "h-64 w-full rounded-lg",
     }),
     "dividend-table-container": buildLoadingMarkup("股利發放歷史", {
@@ -163,9 +167,6 @@ function resetSections() {
     }),
     "revenue-table-container": buildLoadingMarkup("月營收", {
       skeletonClass: "h-40 w-full rounded-lg",
-    }),
-    "income-table-container": buildLoadingMarkup("季度損益", {
-      skeletonClass: "h-64 w-full rounded-lg",
     }),
     "institutional-table-container": buildLoadingMarkup("三大法人買賣超", {
       skeletonClass: "h-64 w-full rounded-lg",
@@ -205,6 +206,11 @@ function resetSections() {
     "risk-tech-container": buildLoadingMarkup("風險與技術面", {
       skeletonClass: "h-48 w-full rounded-lg",
     }),
+    "stock-summary-content": Array.from({ length: 4 }, () =>
+      buildLoadingMarkup("股票摘要", {
+        skeletonClass: "h-24 w-full rounded-lg",
+      }),
+    ).join(""),
     "rule-alerts-container": buildLoadingMarkup("即時規則警示", {
       skeletonClass: "h-12 w-full rounded-lg",
     }),
@@ -288,7 +294,8 @@ async function search(ticker) {
   });
   updateExportPayload(ticker, {
     ...data,
-    strategySnapshot: strategySnapshotLoader.getCached() ?? strategySnapshotData,
+    strategySnapshot:
+      strategySnapshotLoader.getCached() ?? strategySnapshotData,
   });
 
   // 季→年股利聚合（供 dividend / cashflow / financial_ratios / long_term_trend 共用）
@@ -317,15 +324,23 @@ async function search(ticker) {
     );
   }
 
-  // Section 1.5: 即時規則警示（只讀 Live API，不依賴策略分數 snapshot）
+  let ruleResult = null;
+  let ruleScore = computeBuyScore(0, 0);
+
+  // Section 1.7: 即時規則警示（只讀 Live API，不依賴策略分數 snapshot）
   try {
-    const ruleResult = computeRuleAlerts({
+    ruleResult = computeRuleAlerts({
       monthsales: data.sales?.data,
       incomeQ: data.income?.data,
       quotes: data.quotes?.data,
       stats: data.stats?.data,
     });
+    ruleScore = computeBuyScore(
+      ruleResult.latestAvailableCount,
+      ruleResult.latestAlertCount,
+    );
     renderRuleAlerts(ruleResult);
+    setRuleScoreOverlay(computePeriodScores(ruleResult));
   } catch {
     showError(
       document.getElementById("rule-alerts-container"),
@@ -334,19 +349,19 @@ async function search(ticker) {
     );
   }
 
-  // Section 2a: Valuation trend table
+  // Section 2a: 季度財務（整併原「估值趨勢」與「季度損益」）
   try {
     if (data.income) renderValuation(data.income.data, data.bs?.data);
     else
       showError(
         document.getElementById("valuation-table-container"),
-        "估值趨勢資料載入失敗",
+        "季度財務資料載入失敗",
         retryOptions("valuation"),
       );
   } catch {
     showError(
       document.getElementById("valuation-table-container"),
-      "估值趨勢渲染錯誤",
+      "季度財務渲染錯誤",
       retryOptions("valuation"),
     );
   }
@@ -391,22 +406,7 @@ async function search(ticker) {
     );
   }
 
-  // Section 3b: Income
-  try {
-    if (data.income) renderIncome(data.income.data);
-    else
-      showError(
-        document.getElementById("income-table-container"),
-        "損益資料載入失敗",
-        retryOptions("income"),
-      );
-  } catch {
-    showError(
-      document.getElementById("income-table-container"),
-      "損益渲染錯誤",
-      retryOptions("income"),
-    );
-  }
+  // Section 3b: 季度損益已整併進「季度財務」區塊（renderValuation），不再獨立渲染。
 
   // Section 4a: Institutional
   try {
@@ -463,7 +463,25 @@ async function search(ticker) {
     );
   }
 
-  // Section 5.5 (NEW): 策略買入分數表（K 線之後、估值之前）
+  // Section 5.5: 股票摘要（K 線之後、規則警示之前）
+  try {
+    renderStockSummary({
+      profile: data.profile?.data,
+      quotes: data.quotes?.data,
+      sales: data.sales?.data,
+      income: data.income?.data,
+      dividend: annualDiv,
+      ruleScore,
+    });
+  } catch {
+    showError(
+      document.getElementById("stock-summary-content"),
+      "股票摘要渲染錯誤",
+      retryOptions("stock-summary"),
+    );
+  }
+
+  // Section 5.8 (NEW): 策略買入分數表（K 線之後、估值之前）
   try {
     renderStrategyScores(
       strategySnapshotLoader.getCached() ?? strategySnapshotData,

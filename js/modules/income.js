@@ -9,8 +9,13 @@ import {
   valClassLevel,
 } from "../utils.js";
 
+/**
+ * @deprecated 2026-04 — 季度損益已整併進「季度財務」區塊，由
+ *   `js/modules/valuation.js` 的 `renderValuation` 渲染。本檔僅暫時保留以
+ *   防外部 import；下一個 release 將移除整個檔案。
+ */
 export function renderIncome(data) {
-  const container = document.getElementById('income-table-container');
+  const container = document.getElementById("income-table-container");
   if (!container) return;
 
   if (!Array.isArray(data) || data.length === 0) {
@@ -21,12 +26,12 @@ export function renderIncome(data) {
   // Sort descending (newest first)
   const sorted = sortDescByKey(data, "年季").slice(0, 8);
 
-  const rows = sorted.map(d => {
-    const rev = d['營業收入淨額'];
-    const gross = d['營業毛利淨額'];
-    const op = d['營業利益'];
-    const net = d['稅後純益'];
-    const eps = d['每股稅後盈餘'];
+  const rows = sorted.map((d) => {
+    const rev = d["營業收入淨額"];
+    const gross = d["營業毛利淨額"];
+    const op = d["營業利益"];
+    const net = d["稅後純益"];
+    const eps = d["每股稅後盈餘"];
 
     const grossM = calcRate(gross, rev);
     const opM = calcRate(op, rev);
@@ -55,7 +60,9 @@ export function renderIncome(data) {
         </tr>
       </thead>
       <tbody>
-        ${rows.map(r => `
+        ${rows
+          .map(
+            (r) => `
           <tr>
             <td>${escapeHtml(r.quarter || "")}</td>
             <td>${formatRevenueFromThousand(r.rev, "營業收入淨額")}</td>
@@ -64,7 +71,9 @@ export function renderIncome(data) {
             <td class="${valClassLevel(r.netM)}">${formatPercent(r.netM, 2, "淨利率")}</td>
             <td class="${valClassLevel(r.eps)}">${r.eps != null ? formatNumber(r.eps, 2, "每股稅後盈餘") : "—"}</td>
           </tr>
-        `).join('')}
+        `,
+          )
+          .join("")}
       </tbody>
     </table>
   `;

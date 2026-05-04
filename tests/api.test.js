@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   clearQueryCacheForTests,
+  fetchMonthSales,
   fetchQuarterlyIncome,
   queryTable,
 } from "../js/api.js";
@@ -123,4 +124,27 @@ test("fetchQuarterlyIncome requests page_size=14 for 6-period rule alerts", asyn
   assert.match(url.pathname, /md_cm_fi_is_quarterly\/query$/);
   assert.equal(url.searchParams.get("ticker"), "2330");
   assert.equal(url.searchParams.get("page_size"), "14");
+});
+
+test("fetchMonthSales requests page_size=24 for rolling revenue metrics", async () => {
+  clearQueryCacheForTests();
+
+  let requestedUrl = "";
+  const originalFetch = global.fetch;
+  global.fetch = async (url) => {
+    requestedUrl = String(url);
+    return makeSuccessResponse({ data: [] });
+  };
+
+  try {
+    await fetchMonthSales("2330");
+  } finally {
+    global.fetch = originalFetch;
+    clearQueryCacheForTests();
+  }
+
+  const url = new URL(requestedUrl);
+  assert.match(url.pathname, /md_cm_fi_monthsales\/query$/);
+  assert.equal(url.searchParams.get("ticker"), "2330");
+  assert.equal(url.searchParams.get("page_size"), "24");
 });

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { renderKline } from "../js/charts/kline.js";
+import { renderKline, setRuleScoreOverlay } from "../js/charts/kline.js";
 
 function makeClassList(initial = []) {
   const classes = new Set(initial);
@@ -32,6 +32,7 @@ function makeRangeButton(range, active = false) {
 }
 
 function installKlineTestGlobals() {
+  const addedSeries = [];
   const buttons = [
     makeRangeButton("3M"),
     makeRangeButton("6M"),
@@ -45,10 +46,17 @@ function installKlineTestGlobals() {
     clientHeight: 420,
   };
   const chartApi = {
-    addSeries() {
-      return {
-        setData() {},
+    addSeries(type, options) {
+      const series = {
+        type,
+        options,
+        data: null,
+        setData(data) {
+          this.data = data;
+        },
       };
+      addedSeries.push(series);
+      return series;
     },
     addCandlestickSeries() {
       return {
@@ -97,12 +105,14 @@ function installKlineTestGlobals() {
   };
   global.LightweightCharts = {
     CrosshairMode: { Normal: 0 },
+    LineSeries: "LineSeries",
     createChart() {
       return chartApi;
     },
   };
 
   return {
+    addedSeries,
     buttons,
     restore() {
       global.document = originalDocument;
@@ -149,6 +159,32 @@ test("renderKline resets active range button back to 5Y on ticker rerender", () 
 
     assert.equal(button3M.classList.contains("range-btn-active"), false);
     assert.equal(button5Y.classList.contains("range-btn-active"), true);
+  } finally {
+    ctx.restore();
+  }
+});
+
+test("setRuleScoreOverlay renders non-null score points on an amber line series", () => {
+  const ctx = installKlineTestGlobals();
+
+  try {
+    renderKline(sampleQuotes());
+    setRuleScoreOverlay([
+      { date: "2026-01-31", score: 8 },
+      { date: "2026-02-28", score: null },
+      { date: "2026-03-31", score: 6.5 },
+    ]);
+
+    const scoreSeries = ctx.addedSeries.find(
+      (series) => series.type === "LineSeries",
+    );
+    assert.ok(scoreSeries);
+    assert.equal(scoreSeries.options.priceScaleId, "score");
+    assert.equal(scoreSeries.options.color, "#fbbf24");
+    assert.deepEqual(scoreSeries.data, [
+      { time: "2026-01-31", value: 8 },
+      { time: "2026-03-31", value: 6.5 },
+    ]);
   } finally {
     ctx.restore();
   }

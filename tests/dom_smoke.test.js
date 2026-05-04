@@ -58,6 +58,30 @@ test("index.html keeps the CSP, search semantics, and live data timestamp hooks"
   assert.match(chartsVendor, /Lightweight Charts/);
 });
 
+test("index.html places stock summary between K line and standalone rule alerts", () => {
+  const html = readFileSync(
+    new URL("../index.html", import.meta.url),
+    "utf8",
+  );
+
+  const profileStart = html.indexOf('id="section-profile"');
+  const klineStart = html.indexOf('id="section-kline"');
+  const summaryStart = html.indexOf('id="section-stock-summary"');
+  const ruleAlertsStart = html.indexOf('id="section-rule-alerts"');
+  const strategyStart = html.indexOf('id="section-strategy-scores"');
+  const incomeStart = html.indexOf('id="section-income"');
+
+  assert.ok(profileStart >= 0);
+  assert.ok(klineStart > profileStart);
+  assert.ok(summaryStart > klineStart);
+  assert.ok(ruleAlertsStart > summaryStart);
+  assert.ok(strategyStart > ruleAlertsStart);
+  assert.equal(incomeStart, -1);
+  assert.ok(
+    html.indexOf('id="rule-alerts-container"', profileStart) > ruleAlertsStart,
+  );
+});
+
 test("renderProfile escapes upstream text before writing to innerHTML", () => {
   withMockDocument({ "profile-content": { innerHTML: "" } }, (elements) => {
     renderProfile(

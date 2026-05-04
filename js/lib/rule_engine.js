@@ -128,7 +128,10 @@ function checkQuarterlyYOYDeclineSeries(incomeQ, field, thresholdPct) {
     const previousYoy = computeYoy(previous, previousYearAgo);
 
     if (!anchor || currentYoy == null || previousYoy == null) {
-      periods[PERIOD_COUNT - 1 - i] = naCell(label, `${field} YOY lookback 不足`);
+      periods[PERIOD_COUNT - 1 - i] = naCell(
+        label,
+        `${field} YOY lookback 不足`,
+      );
       continue;
     }
 
@@ -201,7 +204,10 @@ function checkS13(incomeQ) {
     const yoy = computeYoy(currentYtd, previousYtd);
 
     if (yoy == null) {
-      periods[PERIOD_COUNT - 1 - i] = naCell(label, "YTD 稅後純益 lookback 不足");
+      periods[PERIOD_COUNT - 1 - i] = naCell(
+        label,
+        "YTD 稅後純益 lookback 不足",
+      );
       continue;
     }
 
@@ -308,9 +314,9 @@ function checkS22(quotes, stats) {
       if (!Number.isFinite(latestClose))
         return naCell(label, `${prefix} 收盤價資料不足`);
 
-      const recent250 = closeRows.slice(-250).map((candidate) =>
-        Number(candidate["收盤價"]),
-      );
+      const recent250 = closeRows
+        .slice(-250)
+        .map((candidate) => Number(candidate["收盤價"]));
       const ma250 = recent250.reduce((sum, value) => sum + value, 0) / 250;
       const stat = lastRowOnOrBefore(sortedStats, "日期", cutoff);
       const alpha = Number(stat?.["Alpha250D"]);
@@ -339,12 +345,7 @@ function checkS22(quotes, stats) {
  * @param {Array<Object>|null} params.stats       md_cm_ta_dailystatistics（5Y 日頻）
  * @returns {{ rules: Array<{code: string, name: string, frequency: string, detail: string, periods: Array<{label: string, triggered: boolean|null, detail: string}>, latest: object, triggered: boolean}>, alertCount: number, latestAlertCount: number, latestAvailableCount: number, latestNaCount: number }}
  */
-export function computeRuleAlerts({
-  monthsales,
-  incomeQ,
-  quotes,
-  stats,
-} = {}) {
+export function computeRuleAlerts({ monthsales, incomeQ, quotes, stats } = {}) {
   const rules = [
     {
       code: "S10",
@@ -421,4 +422,103 @@ export function computeRuleAlerts({
     latestAvailableCount,
     latestNaCount,
   };
+}
+
+export function computeBuyScore(latestAvailableCount, latestAlertCount) {
+  const available = Math.max(
+    0,
+    Math.min(
+      7,
+      Number.isFinite(Number(latestAvailableCount))
+        ? Number(latestAvailableCount)
+        : 0,
+    ),
+  );
+  const triggered = Math.max(
+    0,
+    Math.min(
+      available,
+      Number.isFinite(Number(latestAlertCount)) ? Number(latestAlertCount) : 0,
+    ),
+  );
+  const na = Math.max(0, 7 - available);
+  const score =
+    available === 0 ? null : ((available - triggered) * 10) / available;
+
+  return {
+    score,
+    displayText: score == null ? "資料不足" : score.toFixed(1),
+    available,
+    triggered,
+    na,
+  };
+}
+
+function endOfMonthDate(label) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(label ?? ""));
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${match[1]}-${match[2]}-${String(lastDay).padStart(2, "0")}`;
+}
+
+function monthLabelFromPeriod(period) {
+  const label = String(period?.label ?? "");
+  return /^\d{4}-\d{2}$/.test(label) ? label : null;
+}
+
+function explicitCutoffFromDetail(period) {
+  const detail = String(period?.detail ?? "");
+  const cutoff = /cutoff (\d{4}-\d{2}-\d{2})/.exec(detail);
+  return cutoff ? cutoff[1] : null;
+}
+
+function anchorPeriodForIndex(rules, index) {
+  const monthly = rules
+    .map((rule) => rule.periods?.[index])
+    .find((period) => monthLabelFromPeriod(period));
+  return monthly ?? rules[0]?.periods?.[index] ?? null;
+}
+
+function dateForPeriodIndex(rules, index, label) {
+  // 優先使用任一 rule 在該 index 的 detail 中明示的 cutoff（通常來自 monthEndDaily 規則，
+  // 例如 S22 的 detail 含 "cutoff 2026-02-28; close 100"）。所有 rule 都沒寫 cutoff 時，
+  // 才用 label 推算的當月最後一天作為 fallback。
+  for (const rule of rules) {
+    const cutoff = explicitCutoffFromDetail(rule?.periods?.[index]);
+    if (cutoff) return cutoff;
+  }
+  return endOfMonthDate(label) ?? label;
+}
+
+export function computePeriodScores(ruleResult) {
+  const rules = Array.isArray(ruleResult?.rules) ? ruleResult.rules : [];
+  if (rules.length === 0) return [];
+
+  return Array.from({ length: PERIOD_COUNT }, (_, index) => {
+    const anchor = anchorPeriodForIndex(rules, index);
+    const label =
+      monthLabelFromPeriod(anchor) ?? String(anchor?.label ?? `P${index + 1}`);
+    const date = dateForPeriodIndex(rules, index, label);
+    const cells = rules
+      .map((rule) => rule.periods?.[index])
+      .filter(
+        (period) =>
+          period?.triggered !== null && period?.triggered !== undefined,
+      );
+    const triggered = cells.filter(
+      (period) => period.triggered === true,
+    ).length;
+    const score = computeBuyScore(cells.length, triggered);
+
+    return {
+      date,
+      label,
+      score: score.score,
+      available: score.available,
+      triggered: score.triggered,
+      na: Math.max(0, rules.length - score.available),
+    };
+  });
 }

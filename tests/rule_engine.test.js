@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeRuleAlerts } from "../js/lib/rule_engine.js";
+import {
+  computeBuyScore,
+  computePeriodScores,
+  computeRuleAlerts,
+} from "../js/lib/rule_engine.js";
 
 const RULE_CODES = ["S10", "S11", "S12", "S13", "S20", "S22", "S17"];
 
@@ -300,4 +304,75 @@ test("rules stay off when data is insufficient", () => {
     assert.equal(rule.latest.triggered, null);
     rule.periods.forEach((period) => assert.equal(period.triggered, null));
   });
+});
+
+test("computeBuyScore uses NA-fair reverse scoring for sell-rule alerts", () => {
+  assert.deepEqual(computeBuyScore(7, 0), {
+    score: 10,
+    displayText: "10.0",
+    available: 7,
+    triggered: 0,
+    na: 0,
+  });
+  assert.equal(computeBuyScore(7, 3).score.toFixed(2), "5.71");
+  assert.equal(computeBuyScore(5, 2).score, 6);
+  assert.equal(computeBuyScore(0, 0).score, null);
+  assert.equal(computeBuyScore(5, 9).score, 0);
+});
+
+test("computePeriodScores maps six rule periods to month-end score points", () => {
+  const monthlyLabels = [
+    "2025-10",
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+  ];
+  const ruleResult = {
+    rules: [
+      {
+        code: "S10",
+        periods: monthlyLabels.map((label, index) => ({
+          label,
+          triggered: index === 0 ? null : index === 5,
+          detail: "",
+        })),
+      },
+      {
+        code: "S11",
+        periods: ["2024Q3", "2024Q3", "2024Q4", "2024Q4", "2025Q1", "2025Q1"].map(
+          (label, index) => ({
+            label,
+            triggered: index === 0 ? null : false,
+            detail: "",
+          }),
+        ),
+      },
+      {
+        code: "S22",
+        periods: monthlyLabels.map((label, index) => ({
+          label,
+          triggered: index === 0 ? null : index === 4,
+          detail: `cutoff ${label}-28; close 100`,
+        })),
+      },
+    ],
+  };
+
+  const scores = computePeriodScores(ruleResult);
+
+  assert.equal(scores.length, 6);
+  assert.deepEqual(
+    scores.map((score) => score.label),
+    monthlyLabels,
+  );
+  assert.equal(scores[0].score, null);
+  assert.equal(scores[0].available, 0);
+  assert.equal(scores[4].date, "2026-02-28");
+  assert.equal(scores[4].available, 3);
+  assert.equal(scores[4].triggered, 1);
+  assert.equal(scores[4].score.toFixed(2), "6.67");
+  assert.equal(scores[5].date, "2026-03-28");
+  assert.equal(scores[5].triggered, 1);
 });
