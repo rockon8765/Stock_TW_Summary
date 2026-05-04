@@ -8,6 +8,24 @@ import {
   valClass,
 } from "../utils.js";
 
+const midOf = (above400, below100) =>
+  above400 != null && below100 != null
+    ? Math.max(0, 100 - above400 - below100)
+    : null;
+
+const diff = (current, previous) =>
+  current != null && previous != null ? current - previous : null;
+
+const cell = (value, change) => `
+  <td>
+    ${formatPercent(value)}
+    ${
+      change != null
+        ? `<span class="text-xs ${valClass(change)}">${change < 0 ? "-" : signStr(change)}${Math.abs(change).toFixed(2)}</span>`
+        : ""
+    }
+  </td>`;
+
 export function renderShareholders(data) {
   const container = document.getElementById("shareholders-table-container");
   if (!container) return;
@@ -37,28 +55,37 @@ export function renderShareholders(data) {
             const big1000 = d["1000張以上佔集保比率"];
             const above400 = d["400張以上佔集保比率"];
             const below100 = d["100張以下佔集保比率"];
-            const mid =
-              above400 != null && big1000 != null && below100 != null
-                ? Math.max(0, 100 - above400 - below100)
-                : null;
+            const mid = midOf(above400, below100);
 
             // Calculate week-over-week change
             const prev = sorted[i + 1];
-            const big1000Chg =
-              prev && big1000 != null && prev["1000張以上佔集保比率"] != null
-                ? big1000 - prev["1000張以上佔集保比率"]
-                : null;
+            const big1000Chg = diff(
+              big1000,
+              prev?.["1000張以上佔集保比率"],
+            );
+            const above400Chg = diff(
+              above400,
+              prev?.["400張以上佔集保比率"],
+            );
+            const below100Chg = diff(
+              below100,
+              prev?.["100張以下佔集保比率"],
+            );
+            const midChg = diff(
+              mid,
+              midOf(
+                prev?.["400張以上佔集保比率"],
+                prev?.["100張以下佔集保比率"],
+              ),
+            );
 
             return `
           <tr>
             <td>${escapeHtml(shortDate(d["日期"]))}</td>
-            <td>
-              ${formatPercent(big1000)}
-              ${big1000Chg != null ? `<span class="text-xs ${valClass(big1000Chg)}">${signStr(big1000Chg)}${Math.abs(big1000Chg).toFixed(2)}</span>` : ""}
-            </td>
-            <td>${formatPercent(above400)}</td>
-            <td>${formatPercent(mid)}</td>
-            <td>${formatPercent(below100)}</td>
+            ${cell(big1000, big1000Chg)}
+            ${cell(above400, above400Chg)}
+            ${cell(mid, midChg)}
+            ${cell(below100, below100Chg)}
           </tr>`;
           })
           .join("")}

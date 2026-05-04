@@ -68,14 +68,40 @@ test("shareholder change cues keep explicit +/- signs without inline arrow glyph
         {
           日期: "2026-04-02",
           "1000張以上佔集保比率": 85.48,
-          "400張以上佔集保比率": 88.22,
-          "100張以下佔集保比率": 9.24,
+          "400張以上佔集保比率": 88.25,
+          "100張以下佔集保比率": 9.21,
         },
       ]);
 
       const html = elements["shareholders-table-container"].innerHTML;
 
       assert.match(html, /\+0\.08/);
+      assert.match(html, /\+0\.05/);
+      assert.match(html, /-0\.07/);
+      assert.match(html, /\+0\.02/);
+      assert.doesNotMatch(html, /▲|▼/);
+    },
+  );
+});
+
+test("shareholder rows omit week-over-week cues when no previous row exists", () => {
+  withMockDocument(
+    {
+      "shareholders-table-container": { innerHTML: "" },
+    },
+    (elements) => {
+      renderShareholders([
+        {
+          日期: "2026-04-10",
+          "1000張以上佔集保比率": 85.56,
+          "400張以上佔集保比率": 88.3,
+          "100張以下佔集保比率": 9.14,
+        },
+      ]);
+
+      const html = elements["shareholders-table-container"].innerHTML;
+
+      assert.doesNotMatch(html, /class="text-xs/);
       assert.doesNotMatch(html, /▲|▼/);
     },
   );

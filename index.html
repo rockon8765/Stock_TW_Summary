@@ -66,7 +66,25 @@
         </div>
       </section>
 
-      <!-- Section 1.5 (MOVED): K 線圖（預設展開，緊接 Profile） -->
+      <!-- Section 1.5: 即時規則警示（Live API 近似訊號） -->
+      <section id="section-rule-alerts" class="bg-card rounded-xl p-5 border border-slate-700/50">
+        <div id="rule-alerts-container">
+          <div class="section-loading"><div class="skeleton h-12 w-full rounded-lg"></div></div>
+        </div>
+      </section>
+
+      <!-- Section 1.6: 股票摘要（規則警示後、K 線前） -->
+      <section id="section-stock-summary" class="bg-card rounded-xl p-5 border border-slate-700/50">
+        <h2 class="text-lg font-semibold mb-4">股票摘要</h2>
+        <div id="stock-summary-content" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
+          <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
+          <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
+          <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
+        </div>
+      </section>
+
+      <!-- Section 1.7: K 線圖（預設展開，股票摘要後） -->
       <section id="section-kline" class="bg-card rounded-xl border border-slate-700/50">
         <button id="kline-toggle" class="w-full flex items-center justify-between p-5 text-left" type="button">
           <h2 class="text-lg font-semibold">K 線圖</h2>
@@ -87,24 +105,6 @@
               <div class="skeleton h-full w-full rounded-lg"></div>
             </div>
           </div>
-        </div>
-      </section>
-
-      <!-- Section 1.6: 股票摘要（K 線後、規則警示前） -->
-      <section id="section-stock-summary" class="bg-card rounded-xl p-5 border border-slate-700/50">
-        <h2 class="text-lg font-semibold mb-4">股票摘要</h2>
-        <div id="stock-summary-content" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
-          <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
-          <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
-          <div class="section-loading"><div class="skeleton h-24 w-full rounded-lg"></div></div>
-        </div>
-      </section>
-
-      <!-- Section 1.7: 即時規則警示（Live API 近似訊號） -->
-      <section id="section-rule-alerts" class="bg-card rounded-xl p-5 border border-slate-700/50">
-        <div id="rule-alerts-container">
-          <div class="section-loading"><div class="skeleton h-12 w-full rounded-lg"></div></div>
         </div>
       </section>
 

@@ -89,7 +89,7 @@ export function renderRiskTechnical(statsData) {
       <table class="data-table">
         <thead>
           <tr>
-            <th>月份</th>
+            <th>年月</th>
             <th>月 K9</th>
             <th>月 D9</th>
             <th>月 RSI10</th>

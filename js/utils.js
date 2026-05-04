@@ -100,6 +100,34 @@ export function shortDate(dateStr) {
   return `${parts[1]}/${parts[2]}`;
 }
 
+/**
+ * 將 API 回傳的 6 碼年月字串轉為 YYYY-MM 格式。
+ * @param {string|number|null|undefined} v
+ * @returns {string} null/undefined 回傳空字串；非預期格式原樣返回
+ */
+export function formatYearMonth(v) {
+  if (v == null) return "";
+  const s = String(v);
+  if (!/^\d{6}$/.test(s)) return s;
+  const month = Number(s.slice(4, 6));
+  if (month < 1 || month > 12) return s;
+  return `${s.slice(0, 4)}-${s.slice(4, 6)}`;
+}
+
+/**
+ * 將 API 回傳的 6 碼年季字串轉為 YYYYQ# 格式。
+ * @param {string|number|null|undefined} v
+ * @returns {string} null/undefined 回傳空字串；非預期格式原樣返回
+ */
+export function formatYearQuarter(v) {
+  if (v == null) return "";
+  const s = String(v);
+  if (!/^\d{6}$/.test(s)) return s;
+  const quarter = Number(s.slice(4, 6));
+  if (quarter < 1 || quarter > 4) return s;
+  return `${s.slice(0, 4)}Q${quarter}`;
+}
+
 /** 計算比率 (a/b * 100) */
 export function calcRate(a, b) {
   if (!b || Number(b) === 0) return null;

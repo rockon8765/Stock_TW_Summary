@@ -58,7 +58,7 @@ test("index.html keeps the CSP, search semantics, and live data timestamp hooks"
   assert.match(chartsVendor, /Lightweight Charts/);
 });
 
-test("index.html places stock summary between K line and standalone rule alerts", () => {
+test("index.html orders first-page sections before strategy scores", () => {
   const html = readFileSync(
     new URL("../index.html", import.meta.url),
     "utf8",
@@ -72,10 +72,10 @@ test("index.html places stock summary between K line and standalone rule alerts"
   const incomeStart = html.indexOf('id="section-income"');
 
   assert.ok(profileStart >= 0);
-  assert.ok(klineStart > profileStart);
-  assert.ok(summaryStart > klineStart);
-  assert.ok(ruleAlertsStart > summaryStart);
-  assert.ok(strategyStart > ruleAlertsStart);
+  assert.ok(ruleAlertsStart > profileStart);
+  assert.ok(summaryStart > ruleAlertsStart);
+  assert.ok(klineStart > summaryStart);
+  assert.ok(strategyStart > klineStart);
   assert.equal(incomeStart, -1);
   assert.ok(
     html.indexOf('id="rule-alerts-container"', profileStart) > ruleAlertsStart,

@@ -4,6 +4,7 @@ import {
   formatNumber,
   formatPercent,
   formatRevenueFromThousand,
+  formatYearQuarter,
   showNotApplicable,
   sortDescByKey,
   valClassLevel,
@@ -74,7 +75,7 @@ export function renderValuation(incomeData, bsData) {
           .map(
             (r) => `
           <tr>
-            <td>${escapeHtml(r.quarter || "")}</td>
+            <td>${escapeHtml(formatYearQuarter(r.quarter))}</td>
             <td>${formatRevenueFromThousand(r.rev, "營業收入淨額")}</td>
             <td class="${valClassLevel(r.grossM)}">${formatPercent(r.grossM, 2, "毛利率")}</td>
             <td class="${valClassLevel(r.opM)}">${formatPercent(r.opM, 2, "營益率")}</td>

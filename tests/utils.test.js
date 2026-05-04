@@ -8,6 +8,8 @@ import {
   formatPercent,
   formatRevenue,
   formatRevenueFromThousand,
+  formatYearMonth,
+  formatYearQuarter,
   resolveRetryTicker,
   safeDiv,
   showError,
@@ -54,6 +56,49 @@ test("formatRevenue renders base-currency amounts in 億 with locale separators"
 
 test("formatRevenueFromThousand converts 仟元 input before formatting", () => {
   assert.equal(formatRevenueFromThousand(415191699), "4,151.92 億");
+});
+
+test("formatYearMonth converts 202603 to 2026-03", () => {
+  assert.equal(formatYearMonth("202603"), "2026-03");
+});
+
+test("formatYearMonth accepts numeric input", () => {
+  assert.equal(formatYearMonth(202603), "2026-03");
+});
+
+test("formatYearMonth returns empty for null and undefined", () => {
+  assert.equal(formatYearMonth(null), "");
+  assert.equal(formatYearMonth(undefined), "");
+});
+
+test("formatYearMonth returns input as-is for non-6-digit values", () => {
+  assert.equal(formatYearMonth("2026-03"), "2026-03");
+  assert.equal(formatYearMonth("20260"), "20260");
+});
+
+test("formatYearMonth returns input as-is for out-of-range months", () => {
+  assert.equal(formatYearMonth("202613"), "202613");
+  assert.equal(formatYearMonth("202600"), "202600");
+});
+
+test("formatYearQuarter converts 202504 to 2025Q4", () => {
+  assert.equal(formatYearQuarter("202504"), "2025Q4");
+});
+
+test("formatYearQuarter handles Q1 through Q4", () => {
+  assert.equal(formatYearQuarter("202501"), "2025Q1");
+  assert.equal(formatYearQuarter("202503"), "2025Q3");
+});
+
+test("formatYearQuarter returns input as-is for invalid quarters", () => {
+  assert.equal(formatYearQuarter("202505"), "202505");
+  assert.equal(formatYearQuarter("202500"), "202500");
+  assert.equal(formatYearQuarter("2025Q4"), "2025Q4");
+});
+
+test("formatYearQuarter returns empty for null and undefined", () => {
+  assert.equal(formatYearQuarter(null), "");
+  assert.equal(formatYearQuarter(undefined), "");
 });
 
 test("formatNumber warns on malformed numeric input", () => {

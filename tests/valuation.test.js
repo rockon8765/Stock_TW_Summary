@@ -45,10 +45,10 @@ test("renderValuation keeps the visible table capped at the latest 8 quarters", 
       [],
     );
 
-    assert.match(container.innerHTML, /202504/);
-    assert.match(container.innerHTML, /202401/);
-    assert.doesNotMatch(container.innerHTML, /202304/);
-    assert.doesNotMatch(container.innerHTML, /202303/);
+    assert.match(container.innerHTML, /2025Q4/);
+    assert.match(container.innerHTML, /2024Q1/);
+    assert.doesNotMatch(container.innerHTML, /2023Q4/);
+    assert.doesNotMatch(container.innerHTML, /2023Q3/);
   });
 });
 
@@ -119,6 +119,7 @@ test("renderValuation joins 每股淨值 from bsData by 年季", () => {
         { 年季: "202503", 每股淨值: 80.0 },
       ],
     );
+    assert.match(container.innerHTML, /2025Q4/);
     assert.match(container.innerHTML, /87\.50/);
   });
 });
