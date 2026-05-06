@@ -33,6 +33,9 @@ function makeRangeButton(range, active = false) {
 
 function installKlineTestGlobals() {
   const addedSeries = [];
+  const crosshairHandlers = [];
+  const clickHandlers = [];
+  const unsubscribeCalls = [];
   const buttons = [
     makeRangeButton("3M"),
     makeRangeButton("6M"),
@@ -44,6 +47,16 @@ function installKlineTestGlobals() {
     innerHTML: "",
     clientWidth: 960,
     clientHeight: 420,
+    children: [],
+    appendChild(child) {
+      child.parentNode = this;
+      this.children.push(child);
+      return child;
+    },
+    querySelector(selector) {
+      if (selector !== ".kline-tooltip") return null;
+      return this.children.find((child) => child.className === "kline-tooltip") ?? null;
+    },
   };
   const chartApi = {
     addSeries(type, options) {
@@ -80,6 +93,18 @@ function installKlineTestGlobals() {
     },
     resize() {},
     remove() {},
+    subscribeCrosshairMove(listener) {
+      crosshairHandlers.push(listener);
+    },
+    unsubscribeCrosshairMove(listener) {
+      unsubscribeCalls.push({ type: "crosshair", listener });
+    },
+    subscribeClick(listener) {
+      clickHandlers.push(listener);
+    },
+    unsubscribeClick(listener) {
+      unsubscribeCalls.push({ type: "click", listener });
+    },
   };
 
   const originalDocument = global.document;
@@ -87,6 +112,22 @@ function installKlineTestGlobals() {
   const originalLightweightCharts = global.LightweightCharts;
 
   global.document = {
+    createElement(tagName) {
+      return {
+        tagName: tagName.toUpperCase(),
+        className: "",
+        innerHTML: "",
+        style: {},
+        parentNode: null,
+        remove() {
+          if (!this.parentNode) return;
+          this.parentNode.children = this.parentNode.children.filter(
+            (child) => child !== this,
+          );
+          this.parentNode = null;
+        },
+      };
+    },
     getElementById(id) {
       if (id === "kline-chart") return container;
       return null;
@@ -116,6 +157,10 @@ function installKlineTestGlobals() {
   return {
     addedSeries,
     buttons,
+    clickHandlers,
+    container,
+    crosshairHandlers,
+    unsubscribeCalls,
     restore() {
       global.document = originalDocument;
       global.ResizeObserver = originalResizeObserver;
@@ -163,6 +208,141 @@ test("renderKline uses share-volume values for the volume histogram", () => {
         { time: "2026-04-16", value: 1200000 },
       ],
     );
+  } finally {
+    ctx.restore();
+  }
+});
+
+test("kline tooltip helpers normalize time, previous close, volume, and HTML safely", async () => {
+  const mod = await import("../js/charts/kline.js");
+  assert.equal(typeof mod.timeToDateKey, "function");
+  assert.equal(typeof mod.findPrevClose, "function");
+  assert.equal(typeof mod.formatVolumeForTooltip, "function");
+  assert.equal(typeof mod.buildTooltipPayload, "function");
+  assert.equal(typeof mod.renderTooltipHtml, "function");
+  assert.equal(typeof mod.positionTooltipStyle, "function");
+
+  assert.equal(mod.timeToDateKey("2026-05-04"), "2026-05-04");
+  assert.equal(
+    mod.timeToDateKey({ year: 2026, month: 5, day: 4 }),
+    "2026-05-04",
+  );
+  assert.equal(mod.timeToDateKey(1777852800), "2026-05-04");
+
+  assert.equal(mod.findPrevClose(sampleQuotes(), "2025-01-02"), null);
+  assert.equal(mod.findPrevClose(sampleQuotes(), "2026-04-16"), 105);
+  assert.equal(mod.findPrevClose(sampleQuotes(), "2099-01-01"), null);
+
+  assert.deepEqual(mod.formatVolumeForTooltip(null), {
+    lots: "—",
+    shares: "—",
+  });
+  assert.deepEqual(mod.formatVolumeForTooltip(999), {
+    lots: "<1",
+    shares: "999",
+  });
+  assert.deepEqual(mod.formatVolumeForTooltip(1500), {
+    lots: "1.50",
+    shares: "1,500",
+  });
+  assert.deepEqual(mod.formatVolumeForTooltip(18432000), {
+    lots: "18,432.00",
+    shares: "18,432,000",
+  });
+
+  const payload = mod.buildTooltipPayload({
+    date: '<img src=x onerror="alert(1)">',
+    ohlc: { open: 100, high: 110, low: 95, close: 105 },
+    prevClose: 100,
+    volumeShares: 18432000,
+    score: 72,
+  });
+  assert.equal(payload.change, 5);
+  assert.equal(payload.changePct, 5);
+
+  const html = mod.renderTooltipHtml(payload);
+  assert.match(html, /開/);
+  assert.match(html, /高/);
+  assert.match(html, /低/);
+  assert.match(html, /收/);
+  assert.match(html, /18,432\.00 張/);
+  assert.match(html, /18,432,000 股/);
+  assert.match(html, /規則評分/);
+  assert.doesNotMatch(html, /<img/);
+  assert.match(html, /&lt;img src=x/);
+
+  assert.deepEqual(
+    mod.positionTooltipStyle({ x: 10, y: 10 }, 400, 300, 120, 80),
+    { left: "18px", top: "18px" },
+  );
+  assert.deepEqual(
+    mod.positionTooltipStyle({ x: 390, y: 290 }, 400, 300, 120, 80),
+    { left: "262px", top: "202px" },
+  );
+});
+
+test("renderKline subscribes tooltip handlers, renders OHLC tooltip, and cleans listeners", () => {
+  const ctx = installKlineTestGlobals();
+
+  try {
+    renderKline(sampleQuotes());
+
+    assert.equal(ctx.crosshairHandlers.length, 1);
+    assert.equal(ctx.clickHandlers.length, 1);
+
+    const candleSeries = ctx.addedSeries.find(
+      (series) => series.type === "CandlestickSeries",
+    );
+    const volumeSeries = ctx.addedSeries.find(
+      (series) => series.type === "HistogramSeries",
+    );
+    const scoreSeries = ctx.addedSeries.find(
+      (series) => series.type === "LineSeries",
+    );
+    ctx.crosshairHandlers[0]({
+      point: { x: 120, y: 80 },
+      time: { year: 2026, month: 4, day: 16 },
+      seriesData: new Map([
+        [
+          candleSeries,
+          {
+            open: 105,
+            high: 112,
+            low: 101,
+            close: 108,
+          },
+        ],
+        [volumeSeries, { value: 1200000 }],
+        [scoreSeries, { value: 6.5 }],
+      ]),
+    });
+
+    const tooltip = ctx.container.querySelector(".kline-tooltip");
+    assert.ok(tooltip);
+    assert.equal(tooltip.style.display, "block");
+    assert.match(tooltip.innerHTML, /開/);
+    assert.match(tooltip.innerHTML, /105\.00/);
+    assert.match(tooltip.innerHTML, /高/);
+    assert.match(tooltip.innerHTML, /112\.00/);
+    assert.match(tooltip.innerHTML, /低/);
+    assert.match(tooltip.innerHTML, /101\.00/);
+    assert.match(tooltip.innerHTML, /收/);
+    assert.match(tooltip.innerHTML, /108\.00/);
+    assert.match(tooltip.innerHTML, /1,200\.00 張/);
+    assert.match(tooltip.innerHTML, /1,200,000 股/);
+
+    ctx.crosshairHandlers[0]({
+      point: null,
+      time: null,
+      seriesData: new Map(),
+    });
+    assert.equal(tooltip.style.display, "none");
+
+    renderKline(sampleQuotes());
+    assert.ok(
+      ctx.unsubscribeCalls.some((call) => call.type === "crosshair"),
+    );
+    assert.ok(ctx.unsubscribeCalls.some((call) => call.type === "click"));
   } finally {
     ctx.restore();
   }

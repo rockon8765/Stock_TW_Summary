@@ -229,6 +229,49 @@ html, body { background: var(--color-surface-900); }
   font-weight: 700;
 }
 
+.stock-summary-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  color: var(--color-text-strong);
+}
+
+.stock-summary-score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.stock-summary-score-label,
+.stock-summary-score-meta {
+  color: var(--color-text-subtle);
+  font-size: 0.8rem;
+}
+
+.stock-summary-narrative {
+  color: var(--color-text-body);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.stock-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-surface-700);
+}
+
+.stock-summary-chip {
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: var(--color-surface-900);
+  font-size: 0.8rem;
+}
+
 /* Error state */
 .section-error {
   color: var(--color-error);
@@ -288,6 +331,42 @@ html, body { background: var(--color-surface-900); }
 
 .kline-chart-surface {
   height: 420px;
+  position: relative;
+}
+
+.kline-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 10;
+  display: none;
+  min-width: 10rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--color-surface-700);
+  border-radius: 0.5rem;
+  background: rgba(15, 23, 42, 0.95);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  color: var(--color-text-body);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.kline-tooltip-date {
+  margin-bottom: 0.35rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--color-surface-700);
+  color: var(--color-text-strong);
+  font-weight: 600;
+}
+
+.kline-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.kline-tooltip-label {
+  color: var(--color-text-subtle);
 }
 
 /* === Rule alerts (ScoreCard 規則警示) === */

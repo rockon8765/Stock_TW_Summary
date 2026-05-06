@@ -206,11 +206,9 @@ function resetSections() {
     "risk-tech-container": buildLoadingMarkup("風險與技術面", {
       skeletonClass: "h-48 w-full rounded-lg",
     }),
-    "stock-summary-content": Array.from({ length: 4 }, () =>
-      buildLoadingMarkup("股票摘要", {
-        skeletonClass: "h-24 w-full rounded-lg",
-      }),
-    ).join(""),
+    "stock-summary-content": buildLoadingMarkup("股票摘要", {
+      skeletonClass: "h-16 w-full rounded-lg",
+    }),
     "rule-alerts-container": buildLoadingMarkup("即時規則警示", {
       skeletonClass: "h-12 w-full rounded-lg",
     }),
