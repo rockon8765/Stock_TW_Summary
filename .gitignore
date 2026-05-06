@@ -4,3 +4,9 @@ node_modules/
 .claude/
 .playwright-cli/
 .playwright-mcp/
+
+# data verification generated outputs
+tools/data-verify/reports/*.csv
+tools/data-verify/reports/*.json
+tools/data-verify/reports/tier-a-*.md
+tools/data-verify/reports/tier-b-*.md
