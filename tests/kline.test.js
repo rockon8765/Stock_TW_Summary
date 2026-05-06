@@ -104,7 +104,9 @@ function installKlineTestGlobals() {
     disconnect() {}
   };
   global.LightweightCharts = {
+    CandlestickSeries: "CandlestickSeries",
     CrosshairMode: { Normal: 0 },
+    HistogramSeries: "HistogramSeries",
     LineSeries: "LineSeries",
     createChart() {
       return chartApi;
@@ -131,6 +133,7 @@ function sampleQuotes() {
       最低價: 95,
       收盤價: 105,
       成交量: 1000,
+      成交量_股: 1000123,
     },
     {
       日期: "2026-04-16",
@@ -142,6 +145,28 @@ function sampleQuotes() {
     },
   ];
 }
+
+test("renderKline uses share-volume values for the volume histogram", () => {
+  const ctx = installKlineTestGlobals();
+
+  try {
+    renderKline(sampleQuotes());
+
+    const volumeSeries = ctx.addedSeries.find(
+      (series) => series.type === "HistogramSeries",
+    );
+    assert.ok(volumeSeries);
+    assert.deepEqual(
+      volumeSeries.data.map(({ time, value }) => ({ time, value })),
+      [
+        { time: "2025-01-02", value: 1000123 },
+        { time: "2026-04-16", value: 1200000 },
+      ],
+    );
+  } finally {
+    ctx.restore();
+  }
+});
 
 test("renderKline resets active range button back to 5Y on ticker rerender", () => {
   const ctx = installKlineTestGlobals();

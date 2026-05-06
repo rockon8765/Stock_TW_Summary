@@ -143,6 +143,20 @@ export function setRuleScoreOverlay(periodScores) {
   applyScoreOverlayData(periodScores);
 }
 
+function finiteNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function resolveShareVolume(row) {
+  const shareVolume = finiteNumber(row?.["成交量_股"]);
+  if (shareVolume != null) return shareVolume;
+
+  // Dottdot `成交量` is board-lot volume; chart volume should use shares.
+  const lotVolume = finiteNumber(row?.["成交量"]);
+  return lotVolume == null ? 0 : lotVolume * 1000;
+}
+
 function setRange(range) {
   if (!allData.length) return;
   syncActiveRangeButton(range);
@@ -181,7 +195,7 @@ function setRange(range) {
 
   const volumes = filtered.map((d) => ({
     time: d["日期"],
-    value: d["成交量"] || 0,
+    value: resolveShareVolume(d),
     color:
       d["收盤價"] >= d["開盤價"]
         ? "rgba(239,68,68,0.4)"
