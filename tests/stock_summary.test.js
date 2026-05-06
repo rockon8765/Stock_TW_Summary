@@ -99,6 +99,126 @@ test("stock summary classifiers handle nulls, valuation, growth, and narrative t
   assert.doesNotMatch(narrative, /\{|\bnull\b|NaN|undefined/);
 });
 
+test("classifyMomentum maps each 3M return bucket to its verb and extension", () => {
+  const cases = [
+    { input: null, expected: null },
+    {
+      input: -10,
+      expected: { key: "weak", verb: "下跌", extension: "走勢承壓" },
+    },
+    {
+      input: -3,
+      expected: { key: "soft", verb: "微幅下跌", extension: "走勢偏弱" },
+    },
+    {
+      input: 3,
+      expected: { key: "stable", verb: "微幅上漲", extension: "走勢偏穩" },
+    },
+    {
+      input: 7,
+      expected: { key: "up", verb: "上漲", extension: "動能延續中" },
+    },
+    {
+      input: 15,
+      expected: { key: "strong", verb: "上漲", extension: "動能強勁" },
+    },
+  ];
+  for (const { input, expected } of cases) {
+    assert.deepEqual(
+      stockSummary.classifyMomentum(input),
+      expected,
+      `momentum(${input})`,
+    );
+  }
+});
+
+test("classifyDividend maps yield buckets to text without leaking 0.00% on null", () => {
+  const cases = [
+    {
+      input: null,
+      key: "unknown",
+      textIncludes: "無現金配息資料",
+      textExcludes: /0\.00%/,
+    },
+    {
+      input: 0,
+      key: "unknown",
+      textIncludes: "無現金配息資料",
+      textExcludes: /0\.00%/,
+    },
+    { input: 0.5, key: "low", textIncludes: "偏低" },
+    { input: 2, key: "fair", textIncludes: "中性" },
+    { input: 4, key: "attractive", textIncludes: "吸引力" },
+    { input: 7, key: "high", textIncludes: "偏高" },
+  ];
+  for (const { input, key, textIncludes, textExcludes } of cases) {
+    const result = stockSummary.classifyDividend(input);
+    assert.equal(result.key, key, `dividend(${input}).key`);
+    assert.ok(
+      result.text.includes(textIncludes),
+      `dividend(${input}).text contains "${textIncludes}"`,
+    );
+    if (textExcludes) {
+      assert.doesNotMatch(
+        result.text,
+        textExcludes,
+        `dividend(${input}).text excludes ${textExcludes}`,
+      );
+    }
+  }
+});
+
+test("joinValuationGrowth covers the full key matrix from the plan", () => {
+  const cases = [
+    { val: "high", growth: "strong", expected: "但" },
+    { val: "very_high", growth: "strong", expected: "但" },
+    { val: "high", growth: "mild", expected: "且" },
+    { val: "high", growth: "sales_only", expected: "且" },
+    { val: "high", growth: "eps_only", expected: "且" },
+    { val: "high", growth: "weak", expected: "且" },
+    { val: "very_high", growth: "weak", expected: "且" },
+    { val: "fair", growth: "strong", expected: "，且" },
+    { val: "fair", growth: "mild", expected: "，但" },
+    { val: "fair", growth: "sales_only", expected: "，但" },
+    { val: "fair", growth: "weak", expected: "，但" },
+    { val: "low", growth: "strong", expected: "，且" },
+    { val: "low", growth: "mild", expected: "，且" },
+    { val: "low", growth: "sales_only", expected: "，且" },
+    { val: "low", growth: "eps_only", expected: "，且" },
+    { val: "low", growth: "weak", expected: "，但" },
+    { val: "loss", growth: "strong", expected: "" },
+    { val: "loss", growth: "weak", expected: "" },
+    { val: "unknown", growth: "strong", expected: "，" },
+    { val: "high", growth: "unknown", expected: "，" },
+    { val: "unknown", growth: "unknown", expected: "，" },
+  ];
+  for (const { val, growth, expected } of cases) {
+    assert.equal(
+      stockSummary.joinValuationGrowth(val, growth),
+      expected,
+      `join(${val}, ${growth})`,
+    );
+  }
+});
+
+test("buildNarrative uses an independent loss template when PE is negative", () => {
+  const narrative = stockSummary.buildNarrative({
+    name: "某虧損公司",
+    ticker: "9999",
+    valuation: stockSummary.classifyValuation(-3),
+    growth: stockSummary.classifyGrowth(5, 8),
+    momentum: stockSummary.classifyMomentum(2),
+    dividend: stockSummary.classifyDividend(null),
+    salesYoy: 5,
+    epsYoy: 8,
+    threeM: 2,
+  });
+  assert.match(narrative, /PE 為負/);
+  assert.match(narrative, /；/);
+  assert.doesNotMatch(narrative, /估值偏高/);
+  assert.doesNotMatch(narrative, /\{|\bnull\b|NaN|undefined/);
+});
+
 test("renderStockSummary renders a narrative, chips, and escaped content", () => {
   withMockElement("stock-summary-content", (container) => {
     stockSummary.renderStockSummary({
@@ -159,7 +279,10 @@ test("renderStockSummary renders a narrative, chips, and escaped content", () =>
     assert.match(container.innerHTML, /TTM YoY/);
     assert.match(container.innerHTML, /\+100\.00%/);
     assert.doesNotMatch(container.innerHTML, /<img src=x/);
-    assert.match(container.innerHTML, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/);
+    assert.match(
+      container.innerHTML,
+      /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/,
+    );
   });
 });
 
