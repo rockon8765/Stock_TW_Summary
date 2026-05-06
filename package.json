@@ -3,6 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "data:fetch:dottdot": "node tools/data-verify/fetch_dottdot.mjs",
+    "data:fetch:twse": "node tools/data-verify/fetch_twse.mjs",
+    "data:manual:mops": "node tools/data-verify/fetch_mops.mjs",
+    "data:manual:tdcc": "node tools/data-verify/fetch_tdcc.mjs",
+    "data:compare:tier-a": "node tools/data-verify/compare_tier_a.mjs",
+    "data:compare:tier-b": "node tools/data-verify/compare_tier_b.mjs"
   }
 }
