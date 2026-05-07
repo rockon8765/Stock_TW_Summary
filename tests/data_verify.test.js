@@ -12,6 +12,8 @@ import {
   lotsToShares,
 } from "../tools/data-verify/lib/compare.mjs";
 import {
+  buildInstitutionalComparison,
+  buildProfileComparison,
   buildTierAComparisons,
   bwibbuDateToIso,
   renderMarkdownReport,
@@ -53,7 +55,10 @@ test("data verification contract covers the 15 frontend dottdot datasets", () =>
       "annualBs",
     ],
   );
-  assert.equal(DOTTDOT_DATASETS.find((dataset) => dataset.key === "stats").table, "md_cm_ta_dailystatistics");
+  assert.equal(
+    DOTTDOT_DATASETS.find((dataset) => dataset.key === "stats").table,
+    "md_cm_ta_dailystatistics",
+  );
   assert.ok(SAMPLE_TICKERS.includes("2330"));
   assert.ok(SAMPLE_TICKERS.includes("9999"));
 });
@@ -164,7 +169,10 @@ test("mismatch classifier requires explicit categories for failed comparisons", 
   });
 
   assert.equal(result.status, "fail");
-  assert.equal(classifyMismatch(result, "date_mismatch").classification, "date_mismatch");
+  assert.equal(
+    classifyMismatch(result, "date_mismatch").classification,
+    "date_mismatch",
+  );
   assert.throws(() => classifyMismatch(result, "unknown"));
 });
 
@@ -384,8 +392,14 @@ test("Tier A comparison runner fetches dividend policy and uses the requested qu
 
   assert.ok(fetchedTables.includes("md_cm_ot_dividendpolicy"));
   assert.equal(result.date, "2026-05-05");
-  assert.equal(result.rows.find((row) => row.id === "quotes.close").dottdot_value, 100);
-  assert.equal(result.rows.find((row) => row.id === "quotes.dividend_yield").status, "pass");
+  assert.equal(
+    result.rows.find((row) => row.id === "quotes.close").dottdot_value,
+    100,
+  );
+  assert.equal(
+    result.rows.find((row) => row.id === "quotes.dividend_yield").status,
+    "pass",
+  );
 });
 
 test("Tier A comparisons classify requested-date missing quote rows as date mismatch", () => {
@@ -429,7 +443,10 @@ test("Tier A markdown report includes classification and reason columns", () => 
     ],
   });
 
-  assert.match(markdown, /\| id \| label \| status \| classification \| reason \|/);
+  assert.match(
+    markdown,
+    /\| id \| label \| status \| classification \| reason \|/,
+  );
   assert.match(markdown, /date_mismatch/);
   assert.match(markdown, /requested date not present/);
 });
@@ -463,5 +480,235 @@ test("Tier B transforms rebuild rolling revenue, EPS TTM YoY, and shareholder mi
     每股稅後盈餘: eps,
   }));
   assert.equal(computeEpsTtmYoy(incomeRows), 100);
-  assert.equal(computeShareholderMidTier({ above400: 61.2, below100: 18.3 }), 20.5);
+  assert.equal(
+    computeShareholderMidTier({ above400: 61.2, below100: 18.3 }),
+    20.5,
+  );
+});
+
+function makeQuoteFixture(volumeShares) {
+  return {
+    dottdotQuote: {
+      日期: "2026-05-06",
+      開盤價: 2250,
+      最高價: 2270,
+      最低價: 2240,
+      收盤價: 2250,
+      漲跌: -25,
+      成交量_股: volumeShares,
+      本益比4: 34,
+      股價淨值比: 10.77,
+    },
+    twseQuote: {
+      date: "2026-05-06",
+      open: 2250,
+      high: 2270,
+      low: 2240,
+      close: 2250,
+      change: -25,
+      tradeVolume: 26644983,
+    },
+    bwibbuRow: {
+      date: "2026-05-06",
+      pe: 33.97,
+      pb: 10.77,
+      dividendYield: 0.98,
+    },
+    dottdotDividendRows: [{ 年度: "2025", 年度現金股利: 22 }],
+  };
+}
+
+test("Tier A volume_shares fail is classified as date_mismatch (intraday delay)", () => {
+  const rows = buildTierAComparisons({
+    ticker: "2330",
+    ...makeQuoteFixture(24233983), // dottdot 比 TWSE 少 ~2.4M 股 → 在門檻內、方向正確
+    isLiveLatestMode: true,
+  });
+  const volume = rows.find((row) => row.id === "quotes.volume_shares");
+  assert.equal(volume.status, "fail");
+  assert.equal(volume.classification, "date_mismatch");
+  assert.match(volume.reason, /盤後/);
+  assert.equal(volume.needs_explanation, "no");
+});
+
+test("Tier A volume_shares fail does NOT auto-classify when --date is specified (historical mode)", () => {
+  const rows = buildTierAComparisons({
+    ticker: "2330",
+    ...makeQuoteFixture(24233983),
+    isLiveLatestMode: false, // 指定 --date 後關閉自動分類
+  });
+  const volume = rows.find((row) => row.id === "quotes.volume_shares");
+  assert.equal(volume.status, "fail");
+  assert.equal(volume.classification, "");
+  assert.equal(volume.needs_explanation, "yes");
+});
+
+test("Tier A volume_shares fail does NOT auto-classify when diff exceeds intraday threshold", () => {
+  // 假設 dottdot 顯示 1/1000（單位錯）→ 比 TWSE 少 ~26.6M 股，超過 10M 門檻
+  const rows = buildTierAComparisons({
+    ticker: "2330",
+    ...makeQuoteFixture(26644),
+    isLiveLatestMode: true,
+  });
+  const volume = rows.find((row) => row.id === "quotes.volume_shares");
+  assert.equal(volume.status, "fail");
+  assert.equal(volume.classification, "");
+  assert.equal(volume.needs_explanation, "yes");
+});
+
+test("Tier A volume_shares fail does NOT auto-classify when dottdot shows MORE than TWSE", () => {
+  // 反向：dottdot 多 1M 股 → 不是「盤後延遲」典型方向
+  const rows = buildTierAComparisons({
+    ticker: "2330",
+    ...makeQuoteFixture(27644983),
+    isLiveLatestMode: true,
+  });
+  const volume = rows.find((row) => row.id === "quotes.volume_shares");
+  assert.equal(volume.status, "fail");
+  assert.equal(volume.classification, "");
+  assert.equal(volume.needs_explanation, "yes");
+});
+
+test("Tier A buildInstitutionalComparison emits exactly 3 rows with unique ids (no duplicates)", async () => {
+  const t86Payload = {
+    data: [
+      [
+        "2330",
+        "台積電",
+        "0",
+        "0",
+        "9111968",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "1495677",
+        "377653",
+      ],
+    ],
+  };
+  const rows = await buildInstitutionalComparison({
+    ticker: "2330",
+    dottdotForeignLatest: { 日期: "2026-05-06", 外資買賣超: 9111.968 },
+    dottdotTrustLatest: { 日期: "2026-05-06", 投信買賣超: 1495.677 },
+    dottdotBrokerLatest: { 日期: "2026-05-06", 自營商買賣超: 377.653 },
+    fetchT86: async () => t86Payload,
+    isLiveLatestMode: true,
+    latestKnownDate: "2026-05-06",
+  });
+  assert.equal(rows.length, 3, "expected exactly 3 institutional rows");
+  const ids = rows.map((row) => row.id);
+  assert.deepEqual(
+    new Set(ids).size,
+    ids.length,
+    `institutional ids should be unique, got ${JSON.stringify(ids)}`,
+  );
+  assert.deepEqual(ids.sort(), [
+    "fund.broker_net",
+    "fund.foreign_net",
+    "fund.trust_net",
+  ]);
+});
+
+test("Tier A institutional missing rows are classified as date_mismatch in live latest mode", async () => {
+  const rows = await buildInstitutionalComparison({
+    ticker: "2330",
+    dottdotForeignLatest: null,
+    dottdotTrustLatest: { 日期: "2026-05-06", 投信買賣超: 100 },
+    dottdotBrokerLatest: null,
+    fetchT86: async () => ({ data: [] }),
+    isLiveLatestMode: true,
+    latestKnownDate: "2026-05-06",
+  });
+  const foreign = rows.find((row) => row.id === "fund.foreign_net");
+  assert.equal(foreign.status, "missing");
+  assert.equal(foreign.classification, "date_mismatch");
+  assert.match(foreign.reason, /尚未公布|T\+1/);
+  assert.equal(foreign.needs_explanation, "no");
+
+  const trust = rows.find((row) => row.id === "fund.trust_net");
+  assert.equal(trust.status, "missing"); // T86 empty → no row found
+  assert.equal(trust.classification, "date_mismatch");
+  assert.equal(trust.needs_explanation, "no");
+});
+
+test("Tier A institutional missing does NOT auto-classify in historical mode", async () => {
+  const rows = await buildInstitutionalComparison({
+    ticker: "2330",
+    dottdotForeignLatest: null,
+    dottdotTrustLatest: { 日期: "2026-04-15", 投信買賣超: 100 },
+    dottdotBrokerLatest: null,
+    fetchT86: async () => ({ data: [] }),
+    isLiveLatestMode: false,
+    latestKnownDate: "2026-05-06",
+  });
+  const foreign = rows.find((row) => row.id === "fund.foreign_net");
+  assert.equal(foreign.classification, "");
+  assert.equal(foreign.needs_explanation, "yes");
+});
+
+test("Tier A fund fail does NOT auto-classify when dottdot date is older than latestKnownDate", async () => {
+  // 歷史日期：dottdot row 是 2026-04-15、最新交易日是 5/6 → 不在 T+1 修正窗
+  const t86Payload = {
+    data: [["2330", "台積電", "1000", "500", "500"]],
+  };
+  const rows = await buildInstitutionalComparison({
+    ticker: "2330",
+    dottdotForeignLatest: { 日期: "2026-04-15", 外資買賣超: 1.0 },
+    dottdotTrustLatest: null,
+    dottdotBrokerLatest: null,
+    fetchT86: async () => t86Payload,
+    isLiveLatestMode: true,
+    latestKnownDate: "2026-05-06",
+  });
+  const foreign = rows.find((row) => row.id === "fund.foreign_net");
+  assert.equal(foreign.status, "fail");
+  assert.equal(foreign.classification, "");
+  assert.equal(foreign.needs_explanation, "yes");
+});
+
+test("Tier A fund fail does NOT auto-classify when absDiff exceeds T+1 correction threshold", async () => {
+  // 數量級錯：dottdot 1000 張 → 1M 股 vs TWSE 100M 股 → diff 99M 股，遠超 1M 門檻
+  const t86Payload = {
+    data: [["2330", "台積電", "0", "0", "100000000", "0", "0", "0"]],
+  };
+  const rows = await buildInstitutionalComparison({
+    ticker: "2330",
+    dottdotForeignLatest: { 日期: "2026-05-06", 外資買賣超: 1000 },
+    dottdotTrustLatest: null,
+    dottdotBrokerLatest: null,
+    fetchT86: async () => t86Payload,
+    isLiveLatestMode: true,
+    latestKnownDate: "2026-05-06",
+  });
+  const foreign = rows.find((row) => row.id === "fund.foreign_net");
+  assert.equal(foreign.status, "fail");
+  assert.equal(foreign.classification, "");
+  assert.equal(foreign.needs_explanation, "yes");
+});
+
+test("Tier A profile.industry_match fail is classified as endpoint_semantics", () => {
+  const rows = buildProfileComparison({
+    ticker: "2330",
+    dottdotProfile: {
+      公司名稱: "台灣積體電路製造股份有限公司",
+      產業名稱: "電子–半導體",
+    },
+    twseCompanyRow: {
+      公司名稱: "台灣積體電路製造股份有限公司",
+      產業別: "24",
+    },
+  });
+  const industry = rows.find((row) => row.id === "profile.industry_match");
+  assert.equal(industry.status, "fail");
+  assert.equal(industry.classification, "endpoint_semantics");
+  assert.match(industry.reason, /產業代號/);
+  assert.equal(industry.needs_explanation, "no");
+
+  const companyName = rows.find(
+    (row) => row.id === "profile.company_name_match",
+  );
+  assert.equal(companyName.status, "pass");
+  assert.equal(companyName.classification, "");
 });

@@ -55,10 +55,12 @@ export function compareNumeric({
 
   const diff = dottdotComparable - officialComparable;
   const absDiff = Math.abs(diff);
+  // IEEE 754 浮點容差：tolerance 0.01 可能在 absDiff 為 0.010000000000000009 時誤判
+  const FLOAT_EPSILON = 1e-9;
   return {
     id,
     label,
-    status: absDiff <= tolerance ? "pass" : "fail",
+    status: absDiff <= tolerance + FLOAT_EPSILON ? "pass" : "fail",
     dottdotValue,
     officialValue,
     dottdotComparable,

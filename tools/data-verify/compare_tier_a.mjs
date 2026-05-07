@@ -186,6 +186,9 @@ function dateMismatchResult({
   };
 }
 
+// 經驗門檻：當日盤後零股 + 鉅額交易最大量級（大型權值股 1 日上限約 5K 張）
+const VOLUME_INTRADAY_DELAY_MAX_SHARES = 10_000_000;
+
 export function buildTierAComparisons({
   ticker,
   dottdotQuote,
@@ -193,6 +196,7 @@ export function buildTierAComparisons({
   bwibbuRow,
   dottdotDividendRows = [],
   targetDate,
+  isLiveLatestMode = true,
 }) {
   const date = targetDate || dottdotQuote?.["日期"] || "";
   if (!dottdotQuote) {
@@ -240,16 +244,35 @@ export function buildTierAComparisons({
       ),
   );
 
-  const volumeCheck = resultRow(
-    compareNumeric({
-      id: "quotes.volume_shares",
-      label: "成交量（股）",
-      dottdotValue: resolveQuoteVolume(dottdotQuote),
-      officialValue: twseQuote?.tradeVolume,
-      tolerance: TOLERANCES.shares,
-    }),
-    { ticker, date, source: "TWSE STOCK_DAY" },
-  );
+  const volumeBase = compareNumeric({
+    id: "quotes.volume_shares",
+    label: "成交量（股）",
+    dottdotValue: resolveQuoteVolume(dottdotQuote),
+    officialValue: twseQuote?.tradeVolume,
+    tolerance: TOLERANCES.shares,
+  });
+  // 成交量 fail 只在「live latest 模式 + dottdot 短少 + 差距在盤後典型範圍」三個條件
+  // 同時成立時才自動標 date_mismatch；其他情境（指定歷史日、單位錯、量級異常）
+  // 一律保留為 unexplained，避免吃掉真 bug
+  const volumeIsLikelyIntradayDelay =
+    volumeBase.status === "fail" &&
+    isLiveLatestMode &&
+    Number.isFinite(volumeBase.diff) &&
+    volumeBase.diff < 0 &&
+    volumeBase.absDiff <= VOLUME_INTRADAY_DELAY_MAX_SHARES;
+  const volumeResult = volumeIsLikelyIntradayDelay
+    ? {
+        ...volumeBase,
+        classification: "date_mismatch",
+        reason:
+          "dottdot 對最新交易日成交量為盤中數據，盤後零股／鉅額交易與當日修正於隔一交易日補齊",
+      }
+    : volumeBase;
+  const volumeCheck = resultRow(volumeResult, {
+    ticker,
+    date,
+    source: "TWSE STOCK_DAY",
+  });
 
   const frontendDividendYield = computeFrontendDividendYield(
     dottdotQuote,
@@ -378,24 +401,37 @@ export function buildMonthlySalesComparison({
       0.05,
     ],
   ];
-  return checks.map(([id, label, dottdotField, twseField, tolerance]) =>
-    resultRow(
-      compareNumeric({
-        id,
-        label,
-        dottdotValue: dottdotSalesLatest?.[dottdotField],
-        officialValue: twseSalesRow?.[twseField],
-        tolerance,
-        meta,
-      }),
-      {
-        ticker,
-        date: period,
-        source: "TWSE OpenAPI t187ap05_L",
-      },
-    ),
-  );
+  return checks.map(([id, label, dottdotField, twseField, tolerance]) => {
+    const base = compareNumeric({
+      id,
+      label,
+      dottdotValue: dottdotSalesLatest?.[dottdotField],
+      officialValue: twseSalesRow?.[twseField],
+      tolerance,
+      meta,
+    });
+    // dottdot 月營收某些金融股 YoY 欄位為 null（如國泰金），TWSE 仍能算出
+    // 標 manual_review_required 待 dottdot 端確認原因（可能：去年同期資料缺漏 / 計算規則差異）
+    const enriched =
+      base.status === "missing" &&
+      dottdotSalesLatest?.[dottdotField] == null &&
+      twseSalesRow?.[twseField] != null
+        ? {
+            ...base,
+            classification: "manual_review_required",
+            reason: `dottdot ${dottdotField} 欄位為 null，但 TWSE 有值；可能為金融股月營收結構特殊或上游漏算`,
+          }
+        : base;
+    return resultRow(enriched, {
+      ticker,
+      date: period,
+      source: "TWSE OpenAPI t187ap05_L",
+    });
+  });
 }
+
+// T86 隔日修正典型最大量級（觀察 5 檔多日，最大 ~85 張 = 85K 股，給寬限至 1M 股）
+const FUND_T_PLUS_ONE_CORRECTION_MAX_SHARES = 1_000_000;
 
 export async function buildInstitutionalComparison({
   ticker,
@@ -404,6 +440,8 @@ export async function buildInstitutionalComparison({
   dottdotBrokerLatest,
   fetchT86 = (date) =>
     import("./lib/fetchers.mjs").then(({ fetchTwseT86 }) => fetchTwseT86(date)),
+  isLiveLatestMode = true,
+  latestKnownDate = null,
 }) {
   // T86 column reference (TWSE):
   //   col 4  = 外陸資買賣超 (excl 外資自營商)
@@ -440,16 +478,28 @@ export async function buildInstitutionalComparison({
   for (const inv of investors) {
     const date = inv.dottdotRow?.["日期"];
     if (!date) {
+      // dottdot 該類完全無資料：只在 live latest mode 才視為「該類尚未公布」
+      // 若使用者指定歷史日期但 dottdot 無資料 → 視為真實 missing，不自動分類
+      const missingClassification = isLiveLatestMode ? "date_mismatch" : "";
+      const missingReason = isLiveLatestMode
+        ? "dottdot 該類法人最新一日資料尚未公布（外資 T+1、自營商 T+1，投信即時）"
+        : "";
       rows.push(
         resultRow(
-          compareNumeric({
+          {
             id: inv.id,
             label: inv.label,
+            status: "missing",
+            classification: missingClassification,
+            reason: missingReason,
             dottdotValue: null,
             officialValue: null,
+            dottdotComparable: null,
+            officialComparable: null,
+            diff: null,
+            absDiff: null,
             tolerance: 0,
-            meta: { reason: "dottdot row missing for this investor" },
-          }),
+          },
           { ticker, date: "", source: "TWSE T86" },
         ),
       );
@@ -471,24 +521,50 @@ export async function buildInstitutionalComparison({
         )
       : null;
     const officialValue = t86Row ? toNumber(t86Row[inv.twseColIndex]) : null;
-    rows.push(
-      resultRow(
-        compareNumeric({
-          id: inv.id,
-          label: inv.label,
-          dottdotValue: inv.dottdotRow?.[inv.dottdotField],
-          officialValue,
-          transformDottdot: (value) => lotsToShares(value),
-          tolerance: 0,
-          meta: {
-            dottdot_date: date,
-            t86_date_used: date,
-            t86_available: t86Row != null,
-          },
-        }),
-        { ticker, date, source: "TWSE T86" },
-      ),
-    );
+    const fundBase = compareNumeric({
+      id: inv.id,
+      label: inv.label,
+      dottdotValue: inv.dottdotRow?.[inv.dottdotField],
+      officialValue,
+      transformDottdot: (value) => lotsToShares(value),
+      tolerance: 0,
+      meta: {
+        dottdot_date: date,
+        t86_date_used: date,
+        t86_available: t86Row != null,
+      },
+    });
+    // 三個守門條件：
+    //   (a) live latest mode（沒有 --date）
+    //   (b) 此 dottdot 法人 row 是當前最新交易日（避免歷史日誤分類）
+    //   (c) absDiff 在 T86 隔日修正典型範圍（≤ 1M 股）
+    // 全部滿足才自動標 date_mismatch；其他情境保留為 unexplained
+    const isFundLatestRow =
+      latestKnownDate != null && date === latestKnownDate;
+    const isFundWithinCorrectionWindow =
+      isLiveLatestMode && isFundLatestRow;
+    const isFundFailLikelyCorrection =
+      fundBase.status === "fail" &&
+      isFundWithinCorrectionWindow &&
+      Number.isFinite(fundBase.absDiff) &&
+      fundBase.absDiff <= FUND_T_PLUS_ONE_CORRECTION_MAX_SHARES;
+
+    let fundResult = fundBase;
+    if (fundBase.status === "missing" && !t86Row && isFundWithinCorrectionWindow) {
+      fundResult = {
+        ...fundBase,
+        classification: "date_mismatch",
+        reason: `TWSE T86 ${date} 尚未公布或非交易日`,
+      };
+    } else if (isFundFailLikelyCorrection) {
+      fundResult = {
+        ...fundBase,
+        classification: "date_mismatch",
+        reason:
+          "T86 當日資料隔日修正；歷史日完全一致，差距通常 ≤ 1000 張",
+      };
+    }
+    rows.push(resultRow(fundResult, { ticker, date, source: "TWSE T86" }));
   }
   return rows;
 }
@@ -521,11 +597,22 @@ export function buildProfileComparison({ ticker, dottdotProfile, twseCompanyRow 
         : String(dottdotValue).trim() === String(officialValue).trim()
           ? "pass"
           : "fail";
+    // TWSE 公布產業以代號（例：24）、dottdot 已映射為中文（例：電子–半導體）
+    // 公司名稱：TWSE 含「股份有限公司」尾綴差異
+    const isIndustry = id === "profile.industry_match";
+    const classification =
+      status === "fail" ? (isIndustry ? "endpoint_semantics" : "") : "";
+    const reason =
+      status === "fail" && isIndustry
+        ? "TWSE OpenAPI 公布產業代號（如 24）、dottdot 已映射為中文（如「電子–半導體」），雙方語意一致僅表示形式不同"
+        : "";
     return resultRow(
       {
         id,
         label,
         status,
+        classification,
+        reason,
         dottdotValue,
         officialValue,
         dottdotComparable: dottdotValue,
@@ -623,8 +710,12 @@ export async function runTierAComparison({
   const {
     quote: dottdotQuote,
     targetDate,
+    latestQuote,
   } = selectDottdotQuoteForDate(dottdotQuotes.data, date);
   if (!targetDate) throw new Error("No dottdot quote date available");
+  // live latest mode = 使用者沒有指定 --date；指定歷史日期則關閉所有自動分類
+  const isLiveLatestMode = !date;
+  const latestKnownDate = latestQuote?.["日期"] ?? null;
 
   const twseStockDay = await fetchStockDay(ticker, targetDate);
   const twseRows = normalizeTwseStockDayPayload(twseStockDay);
@@ -664,6 +755,7 @@ export async function runTierAComparison({
       bwibbuRow,
       dottdotDividendRows: dottdotDividend.data,
       targetDate,
+      isLiveLatestMode,
     }),
     ...buildMonthlySalesComparison({
       ticker,
@@ -676,6 +768,8 @@ export async function runTierAComparison({
       dottdotTrustLatest,
       dottdotBrokerLatest,
       fetchT86: (date) => fetchT86Payload(date),
+      isLiveLatestMode,
+      latestKnownDate,
     })),
     ...buildProfileComparison({
       ticker,
