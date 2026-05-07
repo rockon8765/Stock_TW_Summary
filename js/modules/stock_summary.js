@@ -302,5 +302,6 @@ export function renderStockSummary({
         valClassChange(salesTtmYoy),
       )}
     </div>
+    <p class="stock-summary-note text-muted">殖利率以最近年度宣告現金股利 ÷ 最新收盤估算；與證交所資料日期不一致時可能短暫略異。</p>
   `;
 }

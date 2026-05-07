@@ -19,6 +19,7 @@ import {
   findTwseCompanyRow,
   findTwseMonthlySalesRow,
   findTwseT86Row,
+  bwibbuDateToIso,
   normalizeBwibbuPayload,
   normalizeTwseStockDayPayload,
 } from "./lib/fetchers.mjs";
@@ -27,6 +28,9 @@ import {
   reportTimestamp,
   writeTextFile,
 } from "./lib/report_io.mjs";
+import { aggregateDividendsToAnnual } from "../../js/lib/dividend_aggregator.js";
+
+export { bwibbuDateToIso };
 
 function sortDescByDate(rows, field = "日期") {
   return [...(Array.isArray(rows) ? rows : [])].sort((left, right) =>
@@ -40,8 +44,11 @@ function resolveQuoteVolume(row) {
   return null;
 }
 
-function resultRow(result, { ticker, date, source }) {
-  const needsExplanation = ["fail", "missing"].includes(result.status);
+export function resultRow(result, { ticker, date, source }) {
+  const classification = result.classification ?? "";
+  const reason = result.reason ?? result.meta?.reason ?? "";
+  const needsExplanation =
+    ["fail", "missing"].includes(result.status) && !classification;
   return {
     ticker,
     date,
@@ -50,8 +57,8 @@ function resultRow(result, { ticker, date, source }) {
     source,
     status: result.status,
     needs_explanation: needsExplanation ? "yes" : "no",
-    classification: "",
-    reason: "",
+    classification,
+    reason,
     dottdot_value: result.dottdotValue,
     official_value: result.officialValue,
     dottdot_comparable: result.dottdotComparable,
@@ -61,30 +68,176 @@ function resultRow(result, { ticker, date, source }) {
   };
 }
 
+const QUOTE_CHECKS = [
+  {
+    id: "quotes.open",
+    label: "開盤價",
+    dottdotField: "開盤價",
+    officialField: "open",
+    tolerance: TOLERANCES.price,
+  },
+  {
+    id: "quotes.high",
+    label: "最高價",
+    dottdotField: "最高價",
+    officialField: "high",
+    tolerance: TOLERANCES.price,
+  },
+  {
+    id: "quotes.low",
+    label: "最低價",
+    dottdotField: "最低價",
+    officialField: "low",
+    tolerance: TOLERANCES.price,
+  },
+  {
+    id: "quotes.close",
+    label: "收盤價",
+    dottdotField: "收盤價",
+    officialField: "close",
+    tolerance: TOLERANCES.price,
+  },
+  {
+    id: "quotes.change",
+    label: "漲跌",
+    dottdotField: "漲跌",
+    officialField: "change",
+    tolerance: TOLERANCES.price,
+  },
+];
+
+const BWIBBU_CHECKS = [
+  {
+    id: "quotes.pe4",
+    label: "本益比4",
+    dottdotField: "本益比4",
+    officialField: "pe",
+    tolerance: TOLERANCES.pe,
+  },
+  {
+    id: "quotes.pb",
+    label: "股價淨值比",
+    dottdotField: "股價淨值比",
+    officialField: "pb",
+    tolerance: TOLERANCES.pb,
+  },
+  {
+    id: "quotes.dividend_yield",
+    label: "殖利率",
+    officialField: "dividendYield",
+    tolerance: TOLERANCES.ratioPercentPoint,
+  },
+];
+
+export function selectDottdotQuoteForDate(rows, requestedDate) {
+  const sortedRows = sortDescByDate(rows);
+  const latestQuote = sortedRows[0] ?? null;
+  const targetDate = requestedDate || latestQuote?.["日期"] || "";
+  const quote =
+    targetDate === ""
+      ? null
+      : (sortedRows.find((row) => row?.["日期"] === targetDate) ?? null);
+
+  return {
+    quote,
+    targetDate,
+    latestQuote,
+    missingRequestedDate: Boolean(requestedDate && !quote),
+  };
+}
+
+export function computeFrontendDividendYield(dottdotQuote, dottdotDividendRows) {
+  const close = toNumber(dottdotQuote?.["收盤價"]);
+  if (close == null || close <= 0) return null;
+
+  const dividendRows = Array.isArray(dottdotDividendRows)
+    ? dottdotDividendRows
+    : [];
+  const annualRows = dividendRows.some((row) => row?.["年度現金股利"] != null)
+    ? sortDescByDate(dividendRows, "年度")
+    : aggregateDividendsToAnnual(dividendRows);
+  const latestCashDividend = toNumber(annualRows[0]?.["年度現金股利"]);
+  if (latestCashDividend == null) return null;
+  return (latestCashDividend / close) * 100;
+}
+
+function dateMismatchResult({
+  id,
+  label,
+  status = "missing",
+  dottdotValue = null,
+  officialValue = null,
+  tolerance = 0,
+  reason,
+}) {
+  return {
+    id,
+    label,
+    status,
+    classification: "date_mismatch",
+    reason,
+    dottdotValue,
+    officialValue,
+    dottdotComparable: null,
+    officialComparable: null,
+    diff: null,
+    absDiff: null,
+    tolerance,
+  };
+}
+
 export function buildTierAComparisons({
   ticker,
   dottdotQuote,
   twseQuote,
   bwibbuRow,
+  dottdotDividendRows = [],
+  targetDate,
 }) {
-  const date = dottdotQuote?.["日期"] ?? "";
-  const quoteChecks = [
-    ["quotes.open", "開盤價", "開盤價", "open", TOLERANCES.price],
-    ["quotes.high", "最高價", "最高價", "high", TOLERANCES.price],
-    ["quotes.low", "最低價", "最低價", "low", TOLERANCES.price],
-    ["quotes.close", "收盤價", "收盤價", "close", TOLERANCES.price],
-    ["quotes.change", "漲跌", "漲跌", "change", TOLERANCES.price],
-  ].map(([id, label, dottdotField, officialField, tolerance]) =>
-    resultRow(
-      compareNumeric({
-        id,
-        label,
-        dottdotValue: dottdotQuote?.[dottdotField],
-        officialValue: twseQuote?.[officialField],
-        tolerance,
-      }),
-      { ticker, date, source: "TWSE STOCK_DAY" },
-    ),
+  const date = targetDate || dottdotQuote?.["日期"] || "";
+  if (!dottdotQuote) {
+    const reason = date
+      ? `requested date ${date} not present in dottdot quotes`
+      : "dottdot quote row missing";
+    return [
+      ...QUOTE_CHECKS.map((check) =>
+        resultRow(dateMismatchResult({ ...check, reason }), {
+          ticker,
+          date,
+          source: "TWSE STOCK_DAY",
+        }),
+      ),
+      resultRow(
+        dateMismatchResult({
+          id: "quotes.volume_shares",
+          label: "成交量（股）",
+          tolerance: TOLERANCES.shares,
+          reason,
+        }),
+        { ticker, date, source: "TWSE STOCK_DAY" },
+      ),
+      ...BWIBBU_CHECKS.map((check) =>
+        resultRow(dateMismatchResult({ ...check, reason }), {
+          ticker,
+          date,
+          source: "TWSE BWIBBU_d",
+        }),
+      ),
+    ];
+  }
+
+  const quoteChecks = QUOTE_CHECKS.map(
+    ({ id, label, dottdotField, officialField, tolerance }) =>
+      resultRow(
+        compareNumeric({
+          id,
+          label,
+          dottdotValue: dottdotQuote?.[dottdotField],
+          officialValue: twseQuote?.[officialField],
+          tolerance,
+        }),
+        { ticker, date, source: "TWSE STOCK_DAY" },
+      ),
   );
 
   const volumeCheck = resultRow(
@@ -98,28 +251,50 @@ export function buildTierAComparisons({
     { ticker, date, source: "TWSE STOCK_DAY" },
   );
 
-  const bwibbuChecks = [
-    ["quotes.pe4", "本益比4", "本益比4", "pe", TOLERANCES.pe],
-    ["quotes.pb", "股價淨值比", "股價淨值比", "pb", TOLERANCES.pb],
-    [
-      "quotes.dividend_yield",
-      "殖利率",
-      "殖利率",
-      "dividendYield",
-      TOLERANCES.ratioPercentPoint,
-    ],
-  ].map(([id, label, dottdotField, officialField, tolerance]) =>
-    resultRow(
-      compareNumeric({
-        id,
-        label,
-        dottdotValue: dottdotQuote?.[dottdotField],
-        officialValue: bwibbuRow?.[officialField],
-        tolerance,
-      }),
-      { ticker, date, source: "TWSE BWIBBU_d" },
-    ),
+  const frontendDividendYield = computeFrontendDividendYield(
+    dottdotQuote,
+    dottdotDividendRows,
   );
+  const bwibbuDate = bwibbuRow?.date ?? null;
+  const dottdotDate = dottdotQuote?.["日期"] ?? date;
+  const bwibbuValues = {
+    "quotes.pe4": dottdotQuote?.["本益比4"],
+    "quotes.pb": dottdotQuote?.["股價淨值比"],
+    "quotes.dividend_yield": frontendDividendYield,
+  };
+
+  const bwibbuChecks =
+    bwibbuDate !== dottdotDate
+      ? BWIBBU_CHECKS.map((check) =>
+          resultRow(
+            dateMismatchResult({
+              id: check.id,
+              label: check.label,
+              status: "skipped_date_mismatch",
+              dottdotValue: bwibbuValues[check.id],
+              officialValue: bwibbuRow?.[check.officialField],
+              tolerance: check.tolerance,
+              reason: `dottdot quote date ${dottdotDate || "missing"} differs from BWIBBU date ${bwibbuDate || "missing"}`,
+            }),
+            { ticker, date, source: "TWSE BWIBBU_d" },
+          ),
+        )
+      : BWIBBU_CHECKS.map(
+          ({ id, label, dottdotField, officialField, tolerance }) =>
+            resultRow(
+              compareNumeric({
+                id,
+                label,
+                dottdotValue:
+                  id === "quotes.dividend_yield"
+                    ? frontendDividendYield
+                    : dottdotQuote?.[dottdotField],
+                officialValue: bwibbuRow?.[officialField],
+                tolerance,
+              }),
+              { ticker, date, source: "TWSE BWIBBU_d" },
+            ),
+        );
 
   return [...quoteChecks, volumeCheck, ...bwibbuChecks];
 }
@@ -154,7 +329,7 @@ export function buildMonthlySalesComparison({
         label: "月營收期別對齊",
         source: "TWSE OpenAPI t187ap05_L",
         status: "missing",
-        needs_explanation: "yes",
+        needs_explanation: "no",
         classification: "date_mismatch",
         reason: `dottdot=${period}, TWSE=${twsePeriodAd} (TWSE 公開源尚未更新到 dottdot 最新月)`,
         dottdot_value: period,
@@ -365,7 +540,7 @@ export function buildProfileComparison({ ticker, dottdotProfile, twseCompanyRow 
   });
 }
 
-function renderMarkdownReport({ ticker, date, rows }) {
+export function renderMarkdownReport({ ticker, date, rows }) {
   const failed = rows.filter((row) => row.needs_explanation === "yes");
   return `# Tier A Verification Report
 
@@ -375,12 +550,12 @@ function renderMarkdownReport({ ticker, date, rows }) {
 - scope: TWSE quote / BWIBBU fields currently implemented
 - unexplained_mismatch_count: ${failed.length}
 
-| id | label | status | dottdot | official | diff | tolerance | needs explanation |
-|----|-------|--------|---------|----------|------|-----------|-------------------|
+| id | label | status | classification | reason | dottdot | official | diff | tolerance | needs explanation |
+|----|-------|--------|----------------|--------|---------|----------|------|-----------|-------------------|
 ${rows
   .map(
     (row) =>
-      `| ${row.id} | ${row.label} | ${row.status} | ${row.dottdot_value ?? ""} | ${row.official_value ?? ""} | ${row.diff ?? ""} | ${row.tolerance ?? ""} | ${row.needs_explanation} |`,
+      `| ${row.id} | ${row.label} | ${row.status} | ${row.classification ?? ""} | ${row.reason ?? ""} | ${row.dottdot_value ?? ""} | ${row.official_value ?? ""} | ${row.diff ?? ""} | ${row.tolerance ?? ""} | ${row.needs_explanation} |`,
   )
   .join("\n")}
 
@@ -392,6 +567,12 @@ export async function runTierAComparison({
   ticker = "2330",
   date,
   apiKey = process.env.DOTTDOT_API_KEY || "guest",
+  fetchDottdot = fetchDottdotTable,
+  fetchStockDay = fetchTwseStockDay,
+  fetchBwibbu = fetchTwseBwibbu,
+  fetchMonthlySales = fetchTwseMonthlySales,
+  fetchCompanyList = fetchTwseCompanyList,
+  fetchT86Payload = fetchTwseT86,
 } = {}) {
   const [
     dottdotQuotes,
@@ -400,55 +581,63 @@ export async function runTierAComparison({
     dottdotForeign,
     dottdotTrust,
     dottdotBroker,
+    dottdotDividend,
   ] = await Promise.all([
-    fetchDottdotTable("md_cm_ta_dailyquotes", {
+    fetchDottdot("md_cm_ta_dailyquotes", {
       ticker,
       params: { page_size: 5 },
       apiKey,
     }),
-    fetchDottdotTable("md_cm_fi_monthsales", {
+    fetchDottdot("md_cm_fi_monthsales", {
       ticker,
       params: { page_size: 3 },
       apiKey,
     }).catch((error) => ({ error: error.message, data: [] })),
-    fetchDottdotTable("bd_cm_companyprofile", {
+    fetchDottdot("bd_cm_companyprofile", {
       ticker,
       params: { page_size: 1 },
       apiKey,
     }).catch((error) => ({ error: error.message, data: [] })),
-    fetchDottdotTable("md_cm_fd_foreigninsttrading", {
+    fetchDottdot("md_cm_fd_foreigninsttrading", {
       ticker,
       params: { page_size: 5 },
       apiKey,
     }).catch((error) => ({ error: error.message, data: [] })),
-    fetchDottdotTable("md_cm_fd_investmenttrusttrading", {
+    fetchDottdot("md_cm_fd_investmenttrusttrading", {
       ticker,
       params: { page_size: 5 },
       apiKey,
     }).catch((error) => ({ error: error.message, data: [] })),
-    fetchDottdotTable("md_cm_fd_brokertrading", {
+    fetchDottdot("md_cm_fd_brokertrading", {
       ticker,
       params: { page_size: 5 },
+      apiKey,
+    }).catch((error) => ({ error: error.message, data: [] })),
+    fetchDottdot("md_cm_ot_dividendpolicy", {
+      ticker,
+      params: { page_size: 80 },
       apiKey,
     }).catch((error) => ({ error: error.message, data: [] })),
   ]);
 
-  const latestQuote = sortDescByDate(dottdotQuotes.data)[0] ?? null;
-  const targetDate = date || latestQuote?.["日期"];
+  const {
+    quote: dottdotQuote,
+    targetDate,
+  } = selectDottdotQuoteForDate(dottdotQuotes.data, date);
   if (!targetDate) throw new Error("No dottdot quote date available");
 
-  const twseStockDay = await fetchTwseStockDay(ticker, targetDate);
+  const twseStockDay = await fetchStockDay(ticker, targetDate);
   const twseRows = normalizeTwseStockDayPayload(twseStockDay);
   const twseQuote = twseRows.find((row) => row.date === targetDate) ?? null;
-  const bwibbu = normalizeBwibbuPayload(await fetchTwseBwibbu());
+  const bwibbu = normalizeBwibbuPayload(await fetchBwibbu());
   const bwibbuRow = bwibbu.find((row) => row.code === ticker) ?? null;
 
-  const twseSalesPayload = await fetchTwseMonthlySales().catch(() => null);
+  const twseSalesPayload = await fetchMonthlySales().catch(() => null);
   const twseSalesRow = twseSalesPayload
     ? findTwseMonthlySalesRow(twseSalesPayload, ticker)
     : null;
 
-  const twseCompanyPayload = await fetchTwseCompanyList().catch(() => null);
+  const twseCompanyPayload = await fetchCompanyList().catch(() => null);
   const twseCompanyRow = twseCompanyPayload
     ? findTwseCompanyRow(twseCompanyPayload, ticker)
     : null;
@@ -470,9 +659,11 @@ export async function runTierAComparison({
   const rows = [
     ...buildTierAComparisons({
       ticker,
-      dottdotQuote: latestQuote,
+      dottdotQuote,
       twseQuote,
       bwibbuRow,
+      dottdotDividendRows: dottdotDividend.data,
+      targetDate,
     }),
     ...buildMonthlySalesComparison({
       ticker,
@@ -484,7 +675,7 @@ export async function runTierAComparison({
       dottdotForeignLatest,
       dottdotTrustLatest,
       dottdotBrokerLatest,
-      fetchT86: (date) => fetchTwseT86(date),
+      fetchT86: (date) => fetchT86Payload(date),
     })),
     ...buildProfileComparison({
       ticker,
