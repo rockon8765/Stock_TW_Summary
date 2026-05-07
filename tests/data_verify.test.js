@@ -12,8 +12,17 @@ import {
   lotsToShares,
 } from "../tools/data-verify/lib/compare.mjs";
 import {
+  buildTierAComparisons,
+  bwibbuDateToIso,
+  renderMarkdownReport,
+  resultRow,
+  runTierAComparison,
+  selectDottdotQuoteForDate,
+} from "../tools/data-verify/compare_tier_a.mjs";
+import {
   buildDottdotQueryUrl,
   buildTwseStockDayUrl,
+  normalizeBwibbuRow,
   normalizeTwseStockDayRow,
 } from "../tools/data-verify/lib/fetchers.mjs";
 import {
@@ -101,6 +110,37 @@ test("TWSE STOCK_DAY rows normalize ROC dates, comma numbers, and price fields",
   );
 });
 
+test("TWSE BWIBBU rows preserve date, close price, and dividend year", () => {
+  assert.equal(bwibbuDateToIso("20260505"), "2026-05-05");
+  assert.equal(bwibbuDateToIso("115/05/05"), "2026-05-05");
+  assert.equal(bwibbuDateToIso("2026-05-05"), "2026-05-05");
+
+  assert.deepEqual(
+    normalizeBwibbuRow({
+      Date: "20260505",
+      Code: "2330",
+      Name: "台積電",
+      ClosePrice: "1,000.00",
+      DividendYear: "114",
+      DividendYield: "5.50",
+      PEratio: "20.1",
+      PBratio: "8.2",
+      FiscalYearQuarter: "115/1",
+    }),
+    {
+      date: "2026-05-05",
+      code: "2330",
+      name: "台積電",
+      closePrice: 1000,
+      dividendYear: "114",
+      dividendYield: 5.5,
+      pe: 20.1,
+      pb: 8.2,
+      fiscalYearQuarter: "115/1",
+    },
+  );
+});
+
 test("numeric comparison can apply T86 lot-to-share conversion before exact comparison", () => {
   const result = compareNumeric({
     id: "institutional.foreign_net_buy",
@@ -126,6 +166,272 @@ test("mismatch classifier requires explicit categories for failed comparisons", 
   assert.equal(result.status, "fail");
   assert.equal(classifyMismatch(result, "date_mismatch").classification, "date_mismatch");
   assert.throws(() => classifyMismatch(result, "unknown"));
+});
+
+test("Tier A result rows preserve classification and reason", () => {
+  const row = resultRow(
+    {
+      id: "quotes.pb",
+      label: "股價淨值比",
+      status: "fail",
+      classification: "rounding",
+      reason: "official source rounds to two decimals",
+      dottdotValue: 8.21,
+      officialValue: 8.2,
+      dottdotComparable: 8.21,
+      officialComparable: 8.2,
+      diff: 0.01,
+      tolerance: 0.001,
+    },
+    { ticker: "2330", date: "2026-05-05", source: "TWSE BWIBBU_d" },
+  );
+
+  assert.equal(row.classification, "rounding");
+  assert.equal(row.reason, "official source rounds to two decimals");
+  assert.equal(row.needs_explanation, "no");
+});
+
+test("Tier A comparisons skip BWIBBU fields when official and quote dates differ", () => {
+  const rows = buildTierAComparisons({
+    ticker: "2330",
+    targetDate: "2026-05-05",
+    dottdotQuote: {
+      日期: "2026-05-05",
+      開盤價: 100,
+      最高價: 105,
+      最低價: 99,
+      收盤價: 100,
+      漲跌: 1,
+      成交量_股: 1000,
+      本益比4: 20,
+      股價淨值比: 8,
+      殖利率: 99,
+    },
+    twseQuote: {
+      date: "2026-05-05",
+      open: 100,
+      high: 105,
+      low: 99,
+      close: 100,
+      change: 1,
+      tradeVolume: 1000,
+    },
+    bwibbuRow: {
+      date: "2026-05-04",
+      dividendYield: 6,
+      pe: 20,
+      pb: 8,
+    },
+    dottdotDividendRows: [{ 年季: "202501", 現金股利合計: 6 }],
+  });
+
+  const bwibbuRows = rows.filter((row) => row.source === "TWSE BWIBBU_d");
+  assert.equal(bwibbuRows.length, 3);
+  assert.ok(
+    bwibbuRows.every(
+      (row) =>
+        row.status === "skipped_date_mismatch" &&
+        row.classification === "date_mismatch" &&
+        row.needs_explanation === "no",
+    ),
+  );
+});
+
+test("Tier A dividend yield comparison rebuilds the frontend value from annual cash dividend", () => {
+  const rows = buildTierAComparisons({
+    ticker: "2330",
+    targetDate: "2026-05-05",
+    dottdotQuote: {
+      日期: "2026-05-05",
+      開盤價: 100,
+      最高價: 105,
+      最低價: 99,
+      收盤價: 100,
+      漲跌: 1,
+      成交量_股: 1000,
+      本益比4: 20,
+      股價淨值比: 8,
+      殖利率: 99,
+    },
+    twseQuote: {
+      date: "2026-05-05",
+      open: 100,
+      high: 105,
+      low: 99,
+      close: 100,
+      change: 1,
+      tradeVolume: 1000,
+    },
+    bwibbuRow: {
+      date: "2026-05-05",
+      dividendYield: 6,
+      pe: 20,
+      pb: 8,
+    },
+    dottdotDividendRows: [
+      { 年季: "202501", 現金股利合計: 3 },
+      { 年季: "202502", 現金股利合計: 3 },
+    ],
+  });
+
+  const yieldRow = rows.find((row) => row.id === "quotes.dividend_yield");
+  assert.equal(yieldRow.status, "pass");
+  assert.equal(yieldRow.dottdot_value, 6);
+  assert.equal(yieldRow.dottdot_comparable, 6);
+});
+
+test("Tier A requested-date quote selection does not silently fall back to latest", () => {
+  const { quote, targetDate, missingRequestedDate } = selectDottdotQuoteForDate(
+    [
+      { 日期: "2026-05-06", 收盤價: 120 },
+      { 日期: "2026-05-05", 收盤價: 100 },
+    ],
+    "2026-05-05",
+  );
+
+  assert.equal(targetDate, "2026-05-05");
+  assert.equal(quote["收盤價"], 100);
+  assert.equal(missingRequestedDate, false);
+
+  const missing = selectDottdotQuoteForDate(
+    [{ 日期: "2026-05-06", 收盤價: 120 }],
+    "2026-05-05",
+  );
+  assert.equal(missing.targetDate, "2026-05-05");
+  assert.equal(missing.quote, null);
+  assert.equal(missing.missingRequestedDate, true);
+});
+
+test("Tier A comparison runner fetches dividend policy and uses the requested quote row", async () => {
+  const fetchedTables = [];
+  const fetchDottdot = async (tableName) => {
+    fetchedTables.push(tableName);
+    if (tableName === "md_cm_ta_dailyquotes") {
+      return {
+        data: [
+          {
+            日期: "2026-05-06",
+            開盤價: 120,
+            最高價: 125,
+            最低價: 119,
+            收盤價: 120,
+            漲跌: 20,
+            成交量_股: 1200,
+            本益比4: 24,
+            股價淨值比: 9,
+          },
+          {
+            日期: "2026-05-05",
+            開盤價: 100,
+            最高價: 105,
+            最低價: 99,
+            收盤價: 100,
+            漲跌: 1,
+            成交量_股: 1000,
+            本益比4: 20,
+            股價淨值比: 8,
+          },
+        ],
+      };
+    }
+    if (tableName === "md_cm_ot_dividendpolicy") {
+      return {
+        data: [
+          { 年季: "202501", 現金股利合計: 3 },
+          { 年季: "202502", 現金股利合計: 3 },
+        ],
+      };
+    }
+    return { data: [] };
+  };
+
+  const result = await runTierAComparison({
+    ticker: "2330",
+    date: "2026-05-05",
+    fetchDottdot,
+    fetchStockDay: async (_ticker, date) => {
+      assert.equal(date, "2026-05-05");
+      return {
+        data: [
+          [
+            "115/05/05",
+            "1,000",
+            "100,000",
+            "100.00",
+            "105.00",
+            "99.00",
+            "100.00",
+            "+1.00",
+            "10",
+          ],
+        ],
+      };
+    },
+    fetchBwibbu: async () => [
+      {
+        Date: "20260505",
+        Code: "2330",
+        ClosePrice: "100.00",
+        DividendYield: "6.00",
+        PEratio: "20.00",
+        PBratio: "8.00",
+      },
+    ],
+    fetchMonthlySales: async () => [],
+    fetchCompanyList: async () => [],
+    fetchT86Payload: async () => ({ data: [] }),
+  });
+
+  assert.ok(fetchedTables.includes("md_cm_ot_dividendpolicy"));
+  assert.equal(result.date, "2026-05-05");
+  assert.equal(result.rows.find((row) => row.id === "quotes.close").dottdot_value, 100);
+  assert.equal(result.rows.find((row) => row.id === "quotes.dividend_yield").status, "pass");
+});
+
+test("Tier A comparisons classify requested-date missing quote rows as date mismatch", () => {
+  const rows = buildTierAComparisons({
+    ticker: "2330",
+    targetDate: "2026-05-05",
+    dottdotQuote: null,
+    twseQuote: null,
+    bwibbuRow: null,
+    dottdotDividendRows: [],
+  });
+
+  assert.equal(rows.length, 9);
+  assert.ok(
+    rows.every(
+      (row) =>
+        row.status === "missing" &&
+        row.classification === "date_mismatch" &&
+        row.reason.includes("2026-05-05"),
+    ),
+  );
+});
+
+test("Tier A markdown report includes classification and reason columns", () => {
+  const markdown = renderMarkdownReport({
+    ticker: "2330",
+    date: "2026-05-05",
+    rows: [
+      {
+        id: "quotes.volume_shares",
+        label: "成交量（股）",
+        status: "missing",
+        classification: "date_mismatch",
+        reason: "requested date not present in dottdot quotes",
+        dottdot_value: "",
+        official_value: "",
+        diff: null,
+        tolerance: 0,
+        needs_explanation: "no",
+      },
+    ],
+  });
+
+  assert.match(markdown, /\| id \| label \| status \| classification \| reason \|/);
+  assert.match(markdown, /date_mismatch/);
+  assert.match(markdown, /requested date not present/);
 });
 
 test("Tier B transforms rebuild rolling revenue, EPS TTM YoY, and shareholder mid tier", () => {

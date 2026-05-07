@@ -143,11 +143,34 @@ export function normalizeTwseStockDayPayload(payload) {
     .filter(Boolean);
 }
 
+export function bwibbuDateToIso(value) {
+  if (value == null || value === "") return null;
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+
+  const yyyymmdd = text.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (yyyymmdd) {
+    return `${yyyymmdd[1]}-${yyyymmdd[2]}-${yyyymmdd[3]}`;
+  }
+
+  const slashDate = text.match(/^(\d{2,4})\/(\d{1,2})\/(\d{1,2})$/);
+  if (!slashDate) return text;
+
+  const rawYear = Number(slashDate[1]);
+  const year = rawYear < 1911 ? rawYear + 1911 : rawYear;
+  const month = slashDate[2].padStart(2, "0");
+  const day = slashDate[3].padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function normalizeBwibbuRow(row) {
   if (!row || typeof row !== "object") return null;
   return {
+    date: bwibbuDateToIso(row.Date ?? row.date ?? row["日期"] ?? row["資料日期"]),
     code: row.Code ?? row["證券代號"] ?? row["股票代號"],
     name: row.Name ?? row["證券名稱"] ?? row["股票名稱"],
+    closePrice: toNumber(row.ClosePrice ?? row["收盤價"] ?? row["收盤價(元)"]),
+    dividendYear: row.DividendYear ?? row["股利年度"] ?? row["股利所屬年度"],
     dividendYield: toNumber(row.DividendYield ?? row["殖利率(%)"]),
     pe: toNumber(row.PEratio ?? row["本益比"]),
     pb: toNumber(row.PBratio ?? row["股價淨值比"]),

@@ -81,7 +81,7 @@ export function renderDividend({ annualDiv, quotes, annualIs }) {
           <th>現金股利</th>
           <th>股票股利</th>
           <th>股利合計</th>
-          <th>年度現金殖利率</th>
+          <th title="以年度宣告現金股利 ÷ 該年最後交易日收盤計算">年度現金殖利率</th>
           <th>年度發放率</th>
           <th>除息日</th>
         </tr>

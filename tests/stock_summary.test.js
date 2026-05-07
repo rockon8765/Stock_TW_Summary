@@ -274,6 +274,8 @@ test("renderStockSummary renders a narrative, chips, and escaped content", () =>
     assert.match(container.innerHTML, /6\.0/);
     assert.match(container.innerHTML, /警示 2 \/ 可評估 5 \/ 資料不足 2/);
     assert.match(container.innerHTML, /殖利率/);
+    assert.match(container.innerHTML, /最近年度宣告現金股利/);
+    assert.match(container.innerHTML, /與證交所資料日期不一致/);
     assert.match(container.innerHTML, /1M/);
     assert.match(container.innerHTML, /3M/);
     assert.match(container.innerHTML, /TTM YoY/);
