@@ -276,9 +276,9 @@ test("renderStockSummary renders a narrative, chips, and escaped content", () =>
     assert.match(container.innerHTML, /殖利率/);
     assert.match(container.innerHTML, /最近年度宣告現金股利/);
     assert.match(container.innerHTML, /與證交所資料日期不一致/);
-    assert.match(container.innerHTML, /1M/);
-    assert.match(container.innerHTML, /3M/);
-    assert.match(container.innerHTML, /TTM YoY/);
+    assert.match(container.innerHTML, /股價 1M/);
+    assert.match(container.innerHTML, /股價 3M/);
+    assert.match(container.innerHTML, /營收 TTM YoY/);
     assert.match(container.innerHTML, /\+100\.00%/);
     assert.doesNotMatch(container.innerHTML, /<img src=x/);
     assert.match(
@@ -301,9 +301,9 @@ test("renderStockSummary renders missing values as dashes without accidental 0.0
 
     assert.match(container.innerHTML, /資料不足|無現金配息資料/);
     assert.match(container.innerHTML, /殖利率 —/);
-    assert.match(container.innerHTML, /1M —/);
-    assert.match(container.innerHTML, /3M —/);
-    assert.match(container.innerHTML, /TTM YoY —/);
+    assert.match(container.innerHTML, /股價 1M —/);
+    assert.match(container.innerHTML, /股價 3M —/);
+    assert.match(container.innerHTML, /營收 TTM YoY —/);
     assert.doesNotMatch(container.innerHTML, /0\.00%/);
   });
 });

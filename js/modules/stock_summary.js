@@ -290,14 +290,18 @@ export function renderStockSummary({
           ? "—"
           : formatPercent(dividendYield, 2, "現金殖利率"),
       )}
-      ${chip("1M", signedPercent(oneMonth, "1M 報酬"), valClassChange(oneMonth))}
       ${chip(
-        "3M",
+        "股價 1M",
+        signedPercent(oneMonth, "1M 報酬"),
+        valClassChange(oneMonth),
+      )}
+      ${chip(
+        "股價 3M",
         signedPercent(threeMonth, "3M 報酬"),
         valClassChange(threeMonth),
       )}
       ${chip(
-        "TTM YoY",
+        "營收 TTM YoY",
         signedPercent(salesTtmYoy, "TTM 營收 YoY"),
         valClassChange(salesTtmYoy),
       )}
