@@ -20,7 +20,9 @@ function makeClassList(initial = []) {
 function makeRangeButton(range, active = false) {
   return {
     dataset: { range },
-    classList: makeClassList(active ? ["range-btn", "range-btn-active"] : ["range-btn"]),
+    classList: makeClassList(
+      active ? ["range-btn", "range-btn-active"] : ["range-btn"],
+    ),
     _listeners: new Map(),
     addEventListener(type, listener) {
       this._listeners.set(type, listener);
@@ -55,7 +57,10 @@ function installKlineTestGlobals() {
     },
     querySelector(selector) {
       if (selector !== ".kline-tooltip") return null;
-      return this.children.find((child) => child.className === "kline-tooltip") ?? null;
+      return (
+        this.children.find((child) => child.className === "kline-tooltip") ??
+        null
+      );
     },
   };
   const chartApi = {
@@ -340,9 +345,7 @@ test("renderKline subscribes tooltip handlers, renders OHLC tooltip, and cleans 
     assert.equal(tooltip.style.display, "none");
 
     renderKline(sampleQuotes());
-    assert.ok(
-      ctx.unsubscribeCalls.some((call) => call.type === "crosshair"),
-    );
+    assert.ok(ctx.unsubscribeCalls.some((call) => call.type === "crosshair"));
     assert.ok(ctx.unsubscribeCalls.some((call) => call.type === "click"));
   } finally {
     ctx.restore();
@@ -354,8 +357,12 @@ test("renderKline resets active range button back to 5Y on ticker rerender", () 
 
   try {
     renderKline(sampleQuotes());
-    const button3M = ctx.buttons.find((button) => button.dataset.range === "3M");
-    const button5Y = ctx.buttons.find((button) => button.dataset.range === "5Y");
+    const button3M = ctx.buttons.find(
+      (button) => button.dataset.range === "3M",
+    );
+    const button5Y = ctx.buttons.find(
+      (button) => button.dataset.range === "5Y",
+    );
 
     button3M.click();
     assert.equal(button3M.classList.contains("range-btn-active"), true);
@@ -365,6 +372,75 @@ test("renderKline resets active range button back to 5Y on ticker rerender", () 
 
     assert.equal(button3M.classList.contains("range-btn-active"), false);
     assert.equal(button5Y.classList.contains("range-btn-active"), true);
+  } finally {
+    ctx.restore();
+  }
+});
+
+test("setRange filters rule score overlay to the same window as candles (no time-axis stretch)", () => {
+  const ctx = installKlineTestGlobals();
+
+  try {
+    renderKline(sampleQuotes());
+    setRuleScoreOverlay([
+      { date: "2021-06-30", score: 7 }, // 5Y ago — should be excluded by 3M
+      { date: "2025-01-02", score: 5 }, // ~16 月前 — should be excluded by 3M
+      { date: "2026-02-28", score: 4 }, // ~6 週前 — kept by 3M
+      { date: "2026-03-31", score: 3 }, // 最近 — kept by 3M
+    ]);
+
+    const scoreSeries = ctx.addedSeries.find(
+      (series) => series.type === "LineSeries",
+    );
+    assert.ok(scoreSeries, "score series exists");
+
+    // 一開始預設 5Y → 全部 4 點
+    assert.equal(scoreSeries.data.length, 4);
+
+    // 切到 3M 範圍：「now」= 最末日 2026-04-16，3M 前 = 2026-01-16
+    // 所以 2021/2025 的點要被濾掉，剩 2026-02-28 與 2026-03-31
+    const button3M = ctx.buttons.find(
+      (button) => button.dataset.range === "3M",
+    );
+    button3M.click();
+
+    assert.deepEqual(scoreSeries.data, [
+      { time: "2026-02-28", value: 4 },
+      { time: "2026-03-31", value: 3 },
+    ]);
+  } finally {
+    ctx.restore();
+  }
+});
+
+test("setRuleScoreOverlay called AFTER user picked 3M still respects active range", () => {
+  // 防回歸：避免「使用者已切 3M、overlay 資料晚到」造成時間軸再被 5Y 評分拉寬
+  const ctx = installKlineTestGlobals();
+
+  try {
+    renderKline(sampleQuotes());
+    // 1. 使用者先切 3M（此時 overlay 為空）
+    const button3M = ctx.buttons.find(
+      (button) => button.dataset.range === "3M",
+    );
+    button3M.click();
+
+    // 2. 之後 overlay 資料才到（含 5Y 前的點）
+    setRuleScoreOverlay([
+      { date: "2021-06-30", score: 7 }, // 5Y 前
+      { date: "2025-01-02", score: 5 }, // ~16 月前
+      { date: "2026-02-28", score: 4 }, // 在 3M 視窗內
+      { date: "2026-03-31", score: 3 }, // 在 3M 視窗內
+    ]);
+
+    // 期望：仍然只放 3M 視窗內的點，不會把舊的點塞進去
+    const scoreSeries = ctx.addedSeries.find(
+      (series) => series.type === "LineSeries",
+    );
+    assert.deepEqual(scoreSeries.data, [
+      { time: "2026-02-28", value: 4 },
+      { time: "2026-03-31", value: 3 },
+    ]);
   } finally {
     ctx.restore();
   }

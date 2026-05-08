@@ -14,6 +14,7 @@ let volumeSeries = null;
 let scoreOverlaySeries = null;
 let allData = [];
 let pendingScoreOverlay = [];
+let currentRange = "5Y";
 let resizeObserver = null;
 let crosshairHandler = null;
 let clickHandler = null;
@@ -152,13 +153,51 @@ function ensureScoreSeries() {
   });
 }
 
-function applyScoreOverlayData(periodScores = []) {
-  pendingScoreOverlay = Array.isArray(periodScores) ? periodScores : [];
+// 從目前 allData 推出指定 range 的起始日期；allData 為空時回 null（不設下界）
+function rangeStartIso(range) {
+  if (!allData.length) return null;
+  const last = allData[allData.length - 1]["日期"];
+  const from = new Date(last);
+  switch (range) {
+    case "3M":
+      from.setMonth(from.getMonth() - 3);
+      break;
+    case "6M":
+      from.setMonth(from.getMonth() - 6);
+      break;
+    case "1Y":
+      from.setFullYear(from.getFullYear() - 1);
+      break;
+    case "3Y":
+      from.setFullYear(from.getFullYear() - 3);
+      break;
+    case "5Y":
+    default:
+      from.setFullYear(from.getFullYear() - 5);
+      break;
+  }
+  return from.toISOString().slice(0, 10);
+}
+
+// 共用：把 pendingScoreOverlay 依 currentRange 篩出後 setData。
+// setRange / setRuleScoreOverlay 都走這裡，不論呼叫順序都不會把時間軸拉寬。
+function reapplyScoreOverlay() {
   if (!scoreOverlaySeries) return;
+  const fromStr = rangeStartIso(currentRange);
   const data = pendingScoreOverlay
-    .filter((point) => point?.score != null && point?.date)
+    .filter(
+      (point) =>
+        point?.score != null &&
+        point?.date &&
+        (!fromStr || String(point.date) >= fromStr),
+    )
     .map((point) => ({ time: point.date, value: point.score }));
   scoreOverlaySeries.setData(data);
+}
+
+function applyScoreOverlayData(periodScores = []) {
+  pendingScoreOverlay = Array.isArray(periodScores) ? periodScores : [];
+  reapplyScoreOverlay();
 }
 
 export function setRuleScoreOverlay(periodScores) {
@@ -252,8 +291,7 @@ export function buildTooltipPayload({
   const low = finiteNumber(ohlc?.low);
   const close = finiteNumber(ohlc?.close);
   const previous = finiteNumber(prevClose);
-  const change =
-    close != null && previous != null ? close - previous : null;
+  const change = close != null && previous != null ? close - previous : null;
   const changeRatio =
     change != null && previous != null
       ? safeDiv(change, Math.abs(previous))
@@ -396,31 +434,13 @@ function handleTooltipMove(param, tooltipEl, container) {
 
 function setRange(range) {
   if (!allData.length) return;
+  currentRange = range;
   syncActiveRangeButton(range);
 
-  const now = new Date(allData[allData.length - 1]["日期"]);
-  let from = new Date(now);
-
-  switch (range) {
-    case "3M":
-      from.setMonth(from.getMonth() - 3);
-      break;
-    case "6M":
-      from.setMonth(from.getMonth() - 6);
-      break;
-    case "1Y":
-      from.setFullYear(from.getFullYear() - 1);
-      break;
-    case "3Y":
-      from.setFullYear(from.getFullYear() - 3);
-      break;
-    case "5Y":
-      from.setFullYear(from.getFullYear() - 5);
-      break;
-  }
-
-  const fromStr = from.toISOString().slice(0, 10);
-  const filtered = allData.filter((d) => d["日期"] >= fromStr);
+  const fromStr = rangeStartIso(range);
+  const filtered = fromStr
+    ? allData.filter((d) => d["日期"] >= fromStr)
+    : allData;
 
   const candles = filtered.map((d) => ({
     time: d["日期"],
@@ -441,6 +461,8 @@ function setRange(range) {
 
   candleSeries.setData(candles);
   volumeSeries.setData(volumes);
+  // 黃線 overlay 走共用 helper：保證 setRange / setRuleScoreOverlay 走同一套 range-aware 邏輯
+  reapplyScoreOverlay();
   chart.timeScale().fitContent();
 }
 
