@@ -134,7 +134,7 @@ export function fetchShareholderStructure(ticker, signal) {
     "md_cm_fd_stockholderstructure",
     {
       ticker,
-      page_size: 12,
+      page_size: 20,
     },
     signal,
   );

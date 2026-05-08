@@ -4,6 +4,7 @@ import {
   clearQueryCacheForTests,
   fetchMonthSales,
   fetchQuarterlyIncome,
+  fetchShareholderStructure,
   queryTable,
 } from "../js/api.js";
 
@@ -147,4 +148,27 @@ test("fetchMonthSales requests page_size=80 for full-history rule scores", async
   assert.match(url.pathname, /md_cm_fi_monthsales\/query$/);
   assert.equal(url.searchParams.get("ticker"), "2330");
   assert.equal(url.searchParams.get("page_size"), "80");
+});
+
+test("fetchShareholderStructure requests buffer rows for visible week-over-week deltas", async () => {
+  clearQueryCacheForTests();
+
+  let requestedUrl = "";
+  const originalFetch = global.fetch;
+  global.fetch = async (url) => {
+    requestedUrl = String(url);
+    return makeSuccessResponse({ data: [] });
+  };
+
+  try {
+    await fetchShareholderStructure("2330");
+  } finally {
+    global.fetch = originalFetch;
+    clearQueryCacheForTests();
+  }
+
+  const url = new URL(requestedUrl);
+  assert.match(url.pathname, /md_cm_fd_stockholderstructure\/query$/);
+  assert.equal(url.searchParams.get("ticker"), "2330");
+  assert.equal(url.searchParams.get("page_size"), "20");
 });

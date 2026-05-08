@@ -106,3 +106,28 @@ test("shareholder rows omit week-over-week cues when no previous row exists", ()
     },
   );
 });
+
+test("shareholder table shows 12 rows while using the 13th row for oldest visible deltas", () => {
+  withMockDocument(
+    {
+      "shareholders-table-container": { innerHTML: "" },
+    },
+    (elements) => {
+      const rows = Array.from({ length: 13 }, (_, index) => ({
+        日期: `2026-04-${String(13 - index).padStart(2, "0")}`,
+        "1000張以上佔集保比率": 85 - index * 0.1,
+        "400張以上佔集保比率": 88 - index * 0.1,
+        "100張以下佔集保比率": 9 + index * 0.1,
+      }));
+
+      renderShareholders(rows);
+
+      const html = elements["shareholders-table-container"].innerHTML;
+
+      assert.equal((html.match(/<tr>\s*<td>/g) ?? []).length, 12);
+      assert.match(html, /04\/02/);
+      assert.doesNotMatch(html, /04\/01/);
+      assert.match(html, /04\/02[\s\S]*class="text-xs/);
+    },
+  );
+});

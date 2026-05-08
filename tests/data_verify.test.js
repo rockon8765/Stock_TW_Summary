@@ -59,6 +59,16 @@ test("data verification contract covers the 15 frontend dottdot datasets", () =>
     DOTTDOT_DATASETS.find((dataset) => dataset.key === "stats").table,
     "md_cm_ta_dailystatistics",
   );
+  assert.equal(
+    DOTTDOT_DATASETS.find((dataset) => dataset.key === "sales").defaultParams
+      .page_size,
+    80,
+  );
+  assert.equal(
+    DOTTDOT_DATASETS.find((dataset) => dataset.key === "shareholders")
+      .defaultParams.page_size,
+    20,
+  );
   assert.ok(SAMPLE_TICKERS.includes("2330"));
   assert.ok(SAMPLE_TICKERS.includes("9999"));
 });

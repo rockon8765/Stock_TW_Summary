@@ -45,6 +45,7 @@ html, body { background: var(--color-surface-900); }
 .bg-accent { background-color: var(--color-accent); }
 .text-accent { color: var(--color-accent); }
 .text-muted { color: var(--color-text-muted); }
+.text-center { text-align: center; }
 .border-slate-700\/50 { border-color: rgba(71, 85, 105, 0.7); }
 .bg-surface\/95 { background-color: rgba(11, 18, 32, 0.95); }
 .bg-slate-800 { background-color: var(--color-surface-800); }
@@ -229,6 +230,18 @@ html, body { background: var(--color-surface-900); }
   font-weight: 700;
 }
 
+.score-card-large.alert-low {
+  color: var(--color-down);
+}
+
+.score-card-large.alert-mid {
+  color: var(--color-warning);
+}
+
+.score-card-large.alert-high {
+  color: var(--color-up);
+}
+
 .stock-summary-header {
   display: flex;
   align-items: baseline;
@@ -401,7 +414,6 @@ html, body { background: var(--color-surface-900); }
 
 .rule-cat-badge {
   display: inline-block;
-  margin-left: 0.25rem;
   padding: 0.125rem 0.5rem;
   background: var(--badge-accent-bg);
   color: var(--color-accent-soft-text);

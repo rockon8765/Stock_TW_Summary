@@ -267,7 +267,8 @@ test("kline tooltip helpers normalize time, previous close, volume, and HTML saf
   assert.match(html, /收/);
   assert.match(html, /18,432\.00 張/);
   assert.match(html, /18,432,000 股/);
-  assert.match(html, /規則評分/);
+  assert.match(html, /警示分數/);
+  assert.doesNotMatch(html, /規則評分/);
   assert.doesNotMatch(html, /<img/);
   assert.match(html, /&lt;img src=x/);
 

@@ -51,21 +51,20 @@ export function renderInsiderGovernance(insiderData) {
       <thead>
         <tr>
           <th rowspan="2">年月</th>
-          <th colspan="2">董監</th>
-          <th colspan="2">經理人</th>
-          <th colspan="2">大股東</th>
-          <th colspan="3">設質比例</th>
+          <th colspan="3">董監</th>
+          <th colspan="3">經理人</th>
+          <th colspan="3">大股東</th>
         </tr>
         <tr>
-          <th>持股%</th>
+          <th class="text-center">持股%</th>
           <th>增減</th>
-          <th>持股%</th>
+          <th>設質%</th>
+          <th class="text-center">持股%</th>
           <th>增減</th>
-          <th>持股%</th>
+          <th>設質%</th>
+          <th class="text-center">持股%</th>
           <th>增減</th>
-          <th>董監</th>
-          <th>經理人</th>
-          <th>大股東</th>
+          <th>設質%</th>
         </tr>
       </thead>
       <tbody>
@@ -74,14 +73,14 @@ export function renderInsiderGovernance(insiderData) {
             (r) => `
           <tr>
             <td>${escapeHtml(formatYearMonth(r["年月"]))}</td>
-            <td>${formatPercent(r["董監持股比例"])}</td>
+            <td class="text-center">${formatPercent(r["董監持股比例"])}</td>
             <td>${changeCell(r["董監持股比例增減"])}</td>
-            <td>${formatPercent(r["經理人持股比例"])}</td>
-            <td>${changeCell(r["經理人持股比例增減"])}</td>
-            <td>${formatPercent(r["大股東持股比例"])}</td>
-            <td>${changeCell(r["大股東持股比例增減"])}</td>
             <td>${pledgeCell(r["董監設質比例"])}</td>
+            <td class="text-center">${formatPercent(r["經理人持股比例"])}</td>
+            <td>${changeCell(r["經理人持股比例增減"])}</td>
             <td>${pledgeCell(r["經理人設質比例"])}</td>
+            <td class="text-center">${formatPercent(r["大股東持股比例"])}</td>
+            <td>${changeCell(r["大股東持股比例增減"])}</td>
             <td>${pledgeCell(r["大股東設質比例"])}</td>
           </tr>`,
           )

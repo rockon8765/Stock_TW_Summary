@@ -3,6 +3,7 @@ import {
   escapeHtml,
   formatNumber,
   formatRevenueFromThousand,
+  formatYearQuarter,
   safeDiv,
   showNotApplicable,
   sortDescByKey,
@@ -94,7 +95,7 @@ export function renderCashflow(cfData, annualDiv) {
             const fcf = Number(r[FIELD.FCF]);
             return `
               <tr>
-                <td>${escapeHtml(r["年季"] ?? "")}</td>
+                <td>${escapeHtml(formatYearQuarter(r["年季"]))}</td>
                 <td>${Number.isFinite(ocf) ? formatRevenueFromThousand(ocf, FIELD.OCF) : "—"}</td>
                 <td>${Number.isFinite(icf) ? formatRevenueFromThousand(icf, FIELD.ICF) : "—"}</td>
                 <td>${Number.isFinite(ffn) ? formatRevenueFromThousand(ffn, FIELD.FCF_FIN) : "—"}</td>

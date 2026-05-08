@@ -2,12 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildMonthEndAxis,
-  computeBuyScore,
+  computeAlertScore,
   computePeriodScores,
   computeRuleAlerts,
 } from "../js/lib/rule_engine.js";
 
-const RULE_CODES = ["S10", "S11", "S12", "S13", "S20", "S22", "S17"];
+const RULE_CODES = ["S10", "S20", "S11", "S12", "S13", "S22", "S17"];
 
 function makeQuoteRow(date, overrides = {}) {
   return {
@@ -123,6 +123,18 @@ test("computeRuleAlerts returns all seven live rule codes", () => {
     result.rules.map((rule) => rule.code),
     RULE_CODES,
   );
+  assert.deepEqual(
+    result.rules.map((rule) => rule.frequency),
+    [
+      "monthly",
+      "monthly",
+      "quarterly",
+      "quarterly",
+      "quarterly",
+      "monthEndDaily",
+      "monthEndDaily",
+    ],
+  );
   result.rules.forEach((rule) => {
     assert.equal(rule.periods.length, 6);
     assert.equal(typeof rule.frequency, "string");
@@ -134,6 +146,23 @@ test("computeRuleAlerts returns all seven live rule codes", () => {
   assert.equal(result.latestAlertCount, 0);
   assert.equal(result.latestAvailableCount, 0);
   assert.equal(result.latestNaCount, 7);
+});
+
+test("computeRuleAlerts keeps rules grouped by update frequency", () => {
+  const result = computeRuleAlerts({});
+
+  assert.deepEqual(
+    result.rules.map((rule) => `${rule.frequency}:${rule.code}`),
+    [
+      "monthly:S10",
+      "monthly:S20",
+      "quarterly:S11",
+      "quarterly:S12",
+      "quarterly:S13",
+      "monthEndDaily:S22",
+      "monthEndDaily:S17",
+    ],
+  );
 });
 
 test("S20 and S22 labels explain live semantics instead of implying the old snapshot rules", () => {
@@ -296,7 +325,7 @@ test("computeRuleAlerts expands periods and scores to the quote month-end axis",
   assert.equal(result.recentPeriodScores.length, 6);
   assert.equal(result.fullPeriodScores[0].date, "2025-01-31");
   assert.equal(result.fullPeriodScores[0].available, 2);
-  assert.equal(result.fullPeriodScores[0].score, 10);
+  assert.equal(result.fullPeriodScores[0].score, 0);
 });
 
 test("quarterly rules repeat the last settled quarter across monthly axis cells", () => {
@@ -422,18 +451,31 @@ test("rules stay off when data is insufficient", () => {
   });
 });
 
-test("computeBuyScore uses NA-fair reverse scoring for sell-rule alerts", () => {
-  assert.deepEqual(computeBuyScore(7, 0), {
-    score: 10,
-    displayText: "10.0",
+test("computeAlertScore uses NA-fair alert scoring for sell-rule alerts", () => {
+  assert.deepEqual(computeAlertScore(7, 0), {
+    score: 0,
+    displayText: "0.0",
     available: 7,
     triggered: 0,
     na: 0,
   });
-  assert.equal(computeBuyScore(7, 3).score.toFixed(2), "5.71");
-  assert.equal(computeBuyScore(5, 2).score, 6);
-  assert.equal(computeBuyScore(0, 0).score, null);
-  assert.equal(computeBuyScore(5, 9).score, 0);
+  assert.equal(computeAlertScore(7, 3).score.toFixed(2), "4.29");
+  assert.equal(computeAlertScore(7, 7).score, 10);
+  assert.equal(computeAlertScore(0, 0).score, null);
+  assert.equal(computeAlertScore(5, 9).score, 10);
+});
+
+test("computeAlertScore clamps invalid alert inputs before scoring", () => {
+  assert.deepEqual(computeAlertScore(-3, 2), {
+    score: null,
+    displayText: "資料不足",
+    available: 0,
+    triggered: 0,
+    na: 7,
+  });
+  assert.equal(computeAlertScore(99, 3).available, 7);
+  assert.equal(computeAlertScore(4, -2).triggered, 0);
+  assert.equal(computeAlertScore(4, 9).triggered, 4);
 });
 
 test("computePeriodScores maps six rule periods to month-end score points", () => {
@@ -488,7 +530,8 @@ test("computePeriodScores maps six rule periods to month-end score points", () =
   assert.equal(scores[4].date, "2026-02-28");
   assert.equal(scores[4].available, 3);
   assert.equal(scores[4].triggered, 1);
-  assert.equal(scores[4].score.toFixed(2), "6.67");
+  assert.equal(scores[4].score.toFixed(2), "3.33");
   assert.equal(scores[5].date, "2026-03-28");
   assert.equal(scores[5].triggered, 1);
+  assert.equal(scores[5].score.toFixed(2), "3.33");
 });

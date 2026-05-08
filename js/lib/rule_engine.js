@@ -529,6 +529,14 @@ export function computeRuleAlerts({ monthsales, incomeQ, quotes, stats } = {}) {
       periods: checkS10(monthsales, fullAxis),
     },
     {
+      code: "S20",
+      name: "單月營收年增率連兩月衰退",
+      frequency: "monthly",
+      detail:
+        "Live API 直接檢查最近 2 個月的單月營收年增率，不是 ScoreCard 的季資料規則。",
+      periods: checkS20(monthsales, fullAxis),
+    },
+    {
       code: "S11",
       name: "連續兩季單季稅後淨利YOY衰退5%",
       frequency: "quarterly",
@@ -548,14 +556,6 @@ export function computeRuleAlerts({ monthsales, incomeQ, quotes, stats } = {}) {
       frequency: "quarterly",
       detail: "",
       periods: checkS13(incomeQ, fullAxis),
-    },
-    {
-      code: "S20",
-      name: "單月營收年增率連兩月衰退",
-      frequency: "monthly",
-      detail:
-        "Live API 直接檢查最近 2 個月的單月營收年增率，不是 ScoreCard 的季資料規則。",
-      periods: checkS20(monthsales, fullAxis),
     },
     {
       code: "S22",
@@ -606,7 +606,7 @@ export function computeRuleAlerts({ monthsales, incomeQ, quotes, stats } = {}) {
   };
 }
 
-export function computeBuyScore(latestAvailableCount, latestAlertCount) {
+export function computeAlertScore(latestAvailableCount, latestAlertCount) {
   const available = Math.max(
     0,
     Math.min(
@@ -624,8 +624,7 @@ export function computeBuyScore(latestAvailableCount, latestAlertCount) {
     ),
   );
   const na = Math.max(0, 7 - available);
-  const score =
-    available === 0 ? null : ((available - triggered) * 10) / available;
+  const score = available === 0 ? null : (triggered * 10) / available;
 
   return {
     score,
@@ -705,7 +704,7 @@ export function computePeriodScores(ruleResult) {
     const triggered = cells.filter(
       (period) => period.triggered === true,
     ).length;
-    const score = computeBuyScore(cells.length, triggered);
+    const score = computeAlertScore(cells.length, triggered);
 
     return {
       date,

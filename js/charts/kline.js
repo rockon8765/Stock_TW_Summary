@@ -296,8 +296,8 @@ export function renderTooltipHtml(payload = {}) {
     payload.score == null
       ? ""
       : tooltipRow(
-          "規則評分",
-          escapeHtml(displayNumber(payload.score, 1, "規則評分")),
+          "警示分數",
+          escapeHtml(displayNumber(payload.score, 1, "警示分數")),
         );
 
   return `

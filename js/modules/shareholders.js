@@ -8,6 +8,8 @@ import {
   valClass,
 } from "../utils.js";
 
+const DISPLAY_WEEKS = 12;
+
 const midOf = (above400, below100) =>
   above400 != null && below100 != null
     ? Math.max(0, 100 - above400 - below100)
@@ -51,6 +53,7 @@ export function renderShareholders(data) {
       </thead>
       <tbody>
         ${sorted
+          .slice(0, DISPLAY_WEEKS)
           .map((d, i) => {
             const big1000 = d["1000張以上佔集保比率"];
             const above400 = d["400張以上佔集保比率"];

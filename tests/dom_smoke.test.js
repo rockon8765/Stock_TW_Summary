@@ -82,13 +82,14 @@ test("index.html orders first-page sections before strategy scores", () => {
   );
 });
 
-test("index.html discloses that rule score overlay is not point-in-time", () => {
+test("index.html discloses that alert score overlay is not point-in-time", () => {
   const html = readFileSync(
     new URL("../index.html", import.meta.url),
     "utf8",
   );
 
-  assert.match(html, /規則評分為/);
+  assert.match(html, /警示分數為/);
+  assert.match(html, /高分代表警示較多/);
   assert.match(html, /非歷史可投資訊號/);
   assert.match(html, /季財報公告日延遲未列入計算/);
 });
