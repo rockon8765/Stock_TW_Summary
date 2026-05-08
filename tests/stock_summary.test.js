@@ -269,8 +269,9 @@ test("renderStockSummary renders a narrative, chips, and escaped content", () =>
         .length,
       4,
     );
-    assert.match(container.innerHTML, /規則評分/);
-    assert.match(container.innerHTML, /class="score-card-large"/);
+    assert.match(container.innerHTML, /警示分數/);
+    assert.doesNotMatch(container.innerHTML, /規則評分/);
+    assert.match(container.innerHTML, /class="score-card-large alert-mid"/);
     assert.match(container.innerHTML, /6\.0/);
     assert.match(container.innerHTML, /警示 2 \/ 可評估 5 \/ 資料不足 2/);
     assert.match(container.innerHTML, /殖利率/);
@@ -285,6 +286,32 @@ test("renderStockSummary renders a narrative, chips, and escaped content", () =>
       container.innerHTML,
       /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/,
     );
+  });
+});
+
+test("renderStockSummary maps alert score levels to semantic color classes", () => {
+  withMockElement("stock-summary-content", (container) => {
+    const renderWithScore = (score, displayText) => {
+      stockSummary.renderStockSummary({
+        profile: [{ 股票代號: "2330", 股票名稱: "台積電" }],
+        quotes: [],
+        sales: [],
+        income: [],
+        dividend: [],
+        ruleScore: {
+          score,
+          available: 7,
+          triggered: 0,
+          na: 0,
+          displayText,
+        },
+      });
+      return container.innerHTML;
+    };
+
+    assert.match(renderWithScore(2, "2.0"), /score-card-large alert-low/);
+    assert.match(renderWithScore(5, "5.0"), /score-card-large alert-mid/);
+    assert.match(renderWithScore(8, "8.0"), /score-card-large alert-high/);
   });
 });
 

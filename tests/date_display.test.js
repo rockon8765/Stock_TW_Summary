@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { renderCashflow } from "../js/modules/cashflow.js";
 import { renderInsiderGovernance } from "../js/modules/insider_governance.js";
 import { renderRiskTechnical } from "../js/modules/risk_technical.js";
 
@@ -38,6 +39,48 @@ test("renderInsiderGovernance renders 年月 values as YYYY-MM", () => {
 
     assert.match(container.innerHTML, /2026-03/);
     assert.doesNotMatch(container.innerHTML, />202603</);
+  });
+});
+
+test("renderCashflow renders 年季 values as YYYYQ#", () => {
+  withMockElement("cashflow-table-container", (container) => {
+    renderCashflow([
+      {
+        年季: "202504",
+        營業活動之淨現金流入流出: 100000,
+        投資活動之淨現金流入流出: -20000,
+        籌資活動之淨現金流入流出: -30000,
+        自由現金流量: 80000,
+        發放現金股利: -10000,
+      },
+      {
+        年季: "202503",
+        營業活動之淨現金流入流出: 90000,
+        投資活動之淨現金流入流出: -10000,
+        籌資活動之淨現金流入流出: -20000,
+        自由現金流量: 70000,
+        發放現金股利: -10000,
+      },
+      {
+        年季: "202502",
+        營業活動之淨現金流入流出: 80000,
+        投資活動之淨現金流入流出: -10000,
+        籌資活動之淨現金流入流出: -20000,
+        自由現金流量: 60000,
+        發放現金股利: -10000,
+      },
+      {
+        年季: "202501",
+        營業活動之淨現金流入流出: 70000,
+        投資活動之淨現金流入流出: -10000,
+        籌資活動之淨現金流入流出: -20000,
+        自由現金流量: 50000,
+        發放現金股利: -10000,
+      },
+    ]);
+
+    assert.match(container.innerHTML, /2025Q4/);
+    assert.doesNotMatch(container.innerHTML, />202504</);
   });
 });
 

@@ -82,6 +82,14 @@ function countText(value) {
   return value == null ? "—" : formatNumber(value, 0);
 }
 
+function alertScoreClass(score) {
+  const value = finiteNumber(score);
+  if (value == null) return "";
+  if (value >= 7) return "alert-high";
+  if (value <= 3) return "alert-low";
+  return "alert-mid";
+}
+
 function finiteNumber(value) {
   if (value == null) return null;
   const number = Number(value);
@@ -252,6 +260,7 @@ export function renderStockSummary({
   const oneMonth = quoteReturn(quotes, 1);
   const threeMonth = quoteReturn(quotes, 3);
   const scoreText = ruleScore?.score == null ? "—" : ruleScore.displayText;
+  const scoreClass = alertScoreClass(ruleScore?.score);
   const name = profileRow?.["股票名稱"] ?? quote?.["股票名稱"] ?? "";
   const ticker = profileRow?.["股票代號"] ?? quote?.["股票代號"] ?? "";
   const valuation = classifyValuation(pe);
@@ -273,8 +282,8 @@ export function renderStockSummary({
   container.innerHTML = `
     <div class="stock-summary-header">
       <div class="stock-summary-score">
-        <span class="score-card-large">${escapeHtml(scoreText)}</span>
-        <span class="stock-summary-score-label">規則評分</span>
+        <span class="score-card-large ${scoreClass}">${escapeHtml(scoreText)}</span>
+        <span class="stock-summary-score-label">警示分數</span>
       </div>
       <div class="stock-summary-score-meta">
         警示 ${countText(ruleScore?.triggered)} / 可評估 ${countText(

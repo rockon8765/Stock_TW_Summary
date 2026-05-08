@@ -2,7 +2,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { renderRuleAlerts } from "../js/modules/rule_alerts.js";
 
-const CODES = ["S10", "S11", "S12", "S13", "S20", "S22", "S17"];
+const CODES = ["S10", "S20", "S11", "S12", "S13", "S22", "S17"];
+const FREQUENCIES = {
+  S10: "monthly",
+  S20: "monthly",
+  S11: "quarterly",
+  S12: "quarterly",
+  S13: "quarterly",
+  S22: "monthEndDaily",
+  S17: "monthEndDaily",
+};
 
 function withMockElement(id, fn) {
   const element = { innerHTML: "" };
@@ -30,7 +39,7 @@ function makeRuleResult(overrides = {}) {
     return {
       code,
       name: `條件 ${ruleIndex + 1}`,
-      frequency: ruleIndex % 3 === 0 ? "monthly" : ruleIndex % 3 === 1 ? "quarterly" : "monthEndDaily",
+      frequency: FREQUENCIES[code],
       detail: `row detail ${ruleIndex + 1}`,
       periods,
       latest: periods[5],
@@ -58,6 +67,30 @@ test("renderRuleAlerts produces a table with 7 rows and 6 dot cells per row", ()
     assert.match(container.innerHTML, /本期警示 <strong class="val-warn">2\/7<\/strong>/);
     assert.doesNotMatch(container.innerHTML, /class="rule-code"/);
     assert.doesNotMatch(container.innerHTML, />S10</);
+  });
+});
+
+test("renderRuleAlerts shows frequency badges before names in grouped order", () => {
+  withMockElement("rule-alerts-container", (container) => {
+    renderRuleAlerts(makeRuleResult());
+
+    const badges = [
+      ...container.innerHTML.matchAll(/class="rule-cat-badge">([^<]+)/g),
+    ].map((match) => match[1]);
+
+    assert.deepEqual(badges, [
+      "月",
+      "月",
+      "季",
+      "季",
+      "季",
+      "日(月末)",
+      "日(月末)",
+    ]);
+    assert.match(
+      container.innerHTML,
+      /<span class="rule-cat-badge">月<\/span>\s*<span class="rule-name">條件 1<\/span>/,
+    );
   });
 });
 

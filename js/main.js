@@ -37,7 +37,7 @@ import { renderRuleAlerts } from "./modules/rule_alerts.js";
 import { renderStrategyScores } from "./modules/strategy_scores.js";
 import { renderStockSummary } from "./modules/stock_summary.js";
 import {
-  computeBuyScore,
+  computeAlertScore,
   computeRuleAlerts,
 } from "./lib/rule_engine.js";
 import { aggregateDividendsToAnnual } from "./lib/dividend_aggregator.js";
@@ -322,7 +322,7 @@ async function search(ticker) {
   }
 
   let ruleResult = null;
-  let ruleScore = computeBuyScore(0, 0);
+  let ruleScore = computeAlertScore(0, 0);
 
   // Section 1.7: 即時規則警示（只讀 Live API，不依賴策略分數 snapshot）
   try {
@@ -332,7 +332,7 @@ async function search(ticker) {
       quotes: data.quotes?.data,
       stats: data.stats?.data,
     });
-    ruleScore = computeBuyScore(
+    ruleScore = computeAlertScore(
       ruleResult.latestAvailableCount,
       ruleResult.latestAlertCount,
     );

@@ -25,7 +25,7 @@ export const DOTTDOT_DATASETS = Object.freeze([
   {
     key: "sales",
     table: "md_cm_fi_monthsales",
-    defaultParams: { page_size: 24 },
+    defaultParams: { page_size: 80 },
     sections: ["revenue", "stock_summary", "rule_engine"],
   },
   {
@@ -67,7 +67,7 @@ export const DOTTDOT_DATASETS = Object.freeze([
   {
     key: "shareholders",
     table: "md_cm_fd_stockholderstructure",
-    defaultParams: { page_size: 12 },
+    defaultParams: { page_size: 20 },
     sections: ["shareholders"],
   },
   {
@@ -126,9 +126,9 @@ export const NON_DOTTDOT_SOURCES = Object.freeze([
 export const TIER_C_ITEMS = Object.freeze([
   {
     id: "C1",
-    label: "規則評分總分",
+    label: "警示分數總分",
     source: "rule_engine.js -> stock_summary.js",
-    definition: "Live rule alert derived score; confirm weighting against business definition.",
+    definition: "Live rule alert derived alert score; higher means more triggered alerts.",
   },
   {
     id: "C2",
