@@ -6,7 +6,7 @@
  */
 import { escapeHtml } from "../utils.js";
 
-const PERIOD_COUNT = 6;
+const RECENT_PERIOD_COUNT = 6;
 
 const FREQUENCY_LABELS = {
   monthly: "月",
@@ -20,10 +20,13 @@ function countClass(alertCount) {
 }
 
 function normalizePeriods(rule) {
-  const periods = Array.isArray(rule.periods)
-    ? rule.periods.slice(0, PERIOD_COUNT)
-    : [];
-  while (periods.length < PERIOD_COUNT) {
+  const source = Array.isArray(rule.recentPeriods)
+    ? rule.recentPeriods
+    : Array.isArray(rule.periods)
+      ? rule.periods.slice(-RECENT_PERIOD_COUNT)
+      : [];
+  const periods = source.slice(-RECENT_PERIOD_COUNT);
+  while (periods.length < RECENT_PERIOD_COUNT) {
     periods.unshift({ label: "—", triggered: null, detail: "資料不足" });
   }
   return periods;
