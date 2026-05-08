@@ -38,7 +38,6 @@ import { renderStrategyScores } from "./modules/strategy_scores.js";
 import { renderStockSummary } from "./modules/stock_summary.js";
 import {
   computeBuyScore,
-  computePeriodScores,
   computeRuleAlerts,
 } from "./lib/rule_engine.js";
 import { aggregateDividendsToAnnual } from "./lib/dividend_aggregator.js";
@@ -338,7 +337,7 @@ async function search(ticker) {
       ruleResult.latestAlertCount,
     );
     renderRuleAlerts(ruleResult);
-    setRuleScoreOverlay(computePeriodScores(ruleResult));
+    setRuleScoreOverlay(ruleResult.fullPeriodScores);
   } catch {
     showError(
       document.getElementById("rule-alerts-container"),

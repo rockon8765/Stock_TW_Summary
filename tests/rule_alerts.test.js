@@ -82,6 +82,47 @@ test("renderRuleAlerts shows dash cells and summary count for null-triggered lat
   });
 });
 
+test("renderRuleAlerts prefers recentPeriods over full-history periods", () => {
+  withMockElement("rule-alerts-container", (container) => {
+    const result = makeRuleResult();
+    result.rules[0].periods = Array.from({ length: 8 }, (_, index) => ({
+      label: `OLD${index + 1}`,
+      triggered: false,
+      detail: `old detail ${index + 1}`,
+    }));
+    result.rules[0].recentPeriods = Array.from({ length: 6 }, (_, index) => ({
+      label: `RECENT${index + 1}`,
+      triggered: false,
+      detail: `recent detail ${index + 1}`,
+    }));
+
+    renderRuleAlerts(result);
+
+    assert.match(container.innerHTML, /RECENT1/);
+    assert.match(container.innerHTML, /RECENT6/);
+    assert.doesNotMatch(container.innerHTML, /OLD1/);
+    assert.doesNotMatch(container.innerHTML, /OLD8/);
+  });
+});
+
+test("renderRuleAlerts fallback uses the latest six full-history periods", () => {
+  withMockElement("rule-alerts-container", (container) => {
+    const result = makeRuleResult();
+    result.rules[0].periods = Array.from({ length: 8 }, (_, index) => ({
+      label: `FULL${index + 1}`,
+      triggered: false,
+      detail: `detail ${index + 1}`,
+    }));
+
+    renderRuleAlerts(result);
+
+    assert.doesNotMatch(container.innerHTML, /FULL1/);
+    assert.doesNotMatch(container.innerHTML, /FULL2/);
+    assert.match(container.innerHTML, /FULL3/);
+    assert.match(container.innerHTML, /FULL8/);
+  });
+});
+
 test("renderRuleAlerts handles empty or null ruleResult gracefully", () => {
   withMockElement("rule-alerts-container", (container) => {
     renderRuleAlerts(null);

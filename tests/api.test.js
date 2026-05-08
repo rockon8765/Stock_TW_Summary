@@ -103,7 +103,7 @@ test("queryTable shares in-flight requests for the same table and params", async
   }
 });
 
-test("fetchQuarterlyIncome requests page_size=14 for 6-period rule alerts", async () => {
+test("fetchQuarterlyIncome requests page_size=32 for full-history rule scores", async () => {
   clearQueryCacheForTests();
 
   let requestedUrl = "";
@@ -123,10 +123,10 @@ test("fetchQuarterlyIncome requests page_size=14 for 6-period rule alerts", asyn
   const url = new URL(requestedUrl);
   assert.match(url.pathname, /md_cm_fi_is_quarterly\/query$/);
   assert.equal(url.searchParams.get("ticker"), "2330");
-  assert.equal(url.searchParams.get("page_size"), "14");
+  assert.equal(url.searchParams.get("page_size"), "32");
 });
 
-test("fetchMonthSales requests page_size=24 for rolling revenue metrics", async () => {
+test("fetchMonthSales requests page_size=80 for full-history rule scores", async () => {
   clearQueryCacheForTests();
 
   let requestedUrl = "";
@@ -146,5 +146,5 @@ test("fetchMonthSales requests page_size=24 for rolling revenue metrics", async 
   const url = new URL(requestedUrl);
   assert.match(url.pathname, /md_cm_fi_monthsales\/query$/);
   assert.equal(url.searchParams.get("ticker"), "2330");
-  assert.equal(url.searchParams.get("page_size"), "24");
+  assert.equal(url.searchParams.get("page_size"), "80");
 });

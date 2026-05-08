@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildMonthEndAxis,
   computeBuyScore,
   computePeriodScores,
   computeRuleAlerts,
@@ -52,6 +53,14 @@ function makeMonthSalesRows(values = {}) {
   }));
 }
 
+function makeMonthSalesRowsFromMonths(months, values = {}) {
+  return months.map((month) => ({
+    年月: month,
+    累計合併營收成長: values[month]?.cum ?? 1,
+    單月合併營收年成長: values[month]?.single ?? 1,
+  }));
+}
+
 function makeQuarterRows(overrides = {}) {
   const quarters = [
     "202504",
@@ -77,6 +86,10 @@ function makeQuarterRows(overrides = {}) {
   }));
 }
 
+function makeMonthEndQuotes(dates) {
+  return dates.map((date) => makeQuoteRow(date));
+}
+
 function makeDailyRows(endDate, count, rowForIndex) {
   const end = new Date(`${endDate}T00:00:00Z`);
   return Array.from({ length: count }, (_, index) => {
@@ -86,6 +99,23 @@ function makeDailyRows(endDate, count, rowForIndex) {
     return makeQuoteRow(iso, rowForIndex(index, iso));
   });
 }
+
+test("buildMonthEndAxis returns oldest-first actual month-end trading dates", () => {
+  const axis = buildMonthEndAxis([
+    makeQuoteRow("2026-03-31"),
+    makeQuoteRow("2026-01-29"),
+    makeQuoteRow("2026-01-30"),
+    makeQuoteRow("2026-03-27"),
+  ]);
+
+  assert.deepEqual(
+    axis.map(({ monthLabel, dateIso }) => ({ monthLabel, dateIso })),
+    [
+      { monthLabel: "2026-01", dateIso: "2026-01-30" },
+      { monthLabel: "2026-03", dateIso: "2026-03-31" },
+    ],
+  );
+});
 
 test("computeRuleAlerts returns all seven live rule codes", () => {
   const result = computeRuleAlerts({});
@@ -173,10 +203,10 @@ test("S17 month-end snapshots expose the actual cutoff trading day", () => {
   const result = computeRuleAlerts({ quotes });
   const s17 = findRule(result, "S17");
 
-  assert.equal(s17.periods[5].label, "2026-04");
-  assert.match(s17.periods[5].detail, /^cutoff 2026-04-28;/);
-  assert.equal(s17.periods[4].label, "2026-03");
-  assert.match(s17.periods[4].detail, /^cutoff 2026-03-31;/);
+  assert.equal(s17.latest.label, "2026-04");
+  assert.match(s17.latest.detail, /^cutoff 2026-04-28;/);
+  assert.equal(s17.recentPeriods[4].label, "2026-03");
+  assert.match(s17.recentPeriods[4].detail, /^cutoff 2026-03-31;/);
 });
 
 test("S22 triggers when the latest close is below the 250-day average and alpha is weak", () => {
@@ -214,6 +244,92 @@ test("monthly rules return 6 oldest-first periods with month labels", () => {
     findRule(result, "S10").periods.map((period) => period.label),
     ["2024-10", "2024-11", "2024-12", "2025-01", "2025-02", "2025-03"],
   );
+});
+
+test("computeRuleAlerts expands periods and scores to the quote month-end axis", () => {
+  const quotes = makeMonthEndQuotes([
+    "2025-01-31",
+    "2025-02-27",
+    "2025-03-31",
+    "2025-04-30",
+    "2025-05-30",
+    "2025-06-30",
+    "2025-07-31",
+    "2025-08-29",
+  ]);
+  const monthsales = makeMonthSalesRowsFromMonths([
+    "202508",
+    "202507",
+    "202506",
+    "202505",
+    "202504",
+    "202503",
+    "202502",
+    "202501",
+    "202412",
+    "202411",
+  ]);
+
+  const result = computeRuleAlerts({ quotes, monthsales });
+  const s10 = findRule(result, "S10");
+
+  assert.equal(s10.periods.length, 8);
+  assert.equal(s10.recentPeriods.length, 6);
+  assert.deepEqual(
+    s10.periods.map((period) => period.label),
+    [
+      "2025-01",
+      "2025-02",
+      "2025-03",
+      "2025-04",
+      "2025-05",
+      "2025-06",
+      "2025-07",
+      "2025-08",
+    ],
+  );
+  assert.deepEqual(
+    s10.recentPeriods.map((period) => period.label),
+    ["2025-03", "2025-04", "2025-05", "2025-06", "2025-07", "2025-08"],
+  );
+  assert.equal(result.fullPeriodScores.length, 8);
+  assert.equal(result.recentPeriodScores.length, 6);
+  assert.equal(result.fullPeriodScores[0].date, "2025-01-31");
+  assert.equal(result.fullPeriodScores[0].available, 2);
+  assert.equal(result.fullPeriodScores[0].score, 10);
+});
+
+test("quarterly rules repeat the last settled quarter across monthly axis cells", () => {
+  const result = computeRuleAlerts({
+    quotes: makeMonthEndQuotes([
+      "2025-01-31",
+      "2025-02-27",
+      "2025-03-31",
+      "2025-04-30",
+      "2025-05-30",
+      "2025-06-30",
+    ]),
+    incomeQ: makeQuarterRows(),
+  });
+
+  assert.deepEqual(
+    findRule(result, "S11").periods.map((period) => period.label),
+    ["2024Q4", "2024Q4", "2025Q1", "2025Q1", "2025Q1", "2025Q2"],
+  );
+});
+
+test("computeRuleAlerts keeps recent UI periods when quotes are unavailable", () => {
+  const result = computeRuleAlerts({
+    monthsales: makeMonthSalesRows(),
+    incomeQ: makeQuarterRows(),
+  });
+
+  assert.deepEqual(result.fullPeriodScores, []);
+  assert.equal(result.recentPeriodScores.length, 6);
+  assert.equal(findRule(result, "S10").recentPeriods.length, 6);
+  assert.equal(findRule(result, "S11").recentPeriods.length, 6);
+  assert.equal(findRule(result, "S10").recentPeriods[5].label, "2025-03");
+  assert.equal(findRule(result, "S11").recentPeriods[5].label, "2025Q4");
 });
 
 test("quarterly oldest period is N/A when YOY lookback is insufficient", () => {
