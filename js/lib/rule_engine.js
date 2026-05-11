@@ -9,6 +9,12 @@ import { sortAscByKey, sortDescByKey } from "../utils.js";
 
 const RECENT_PERIOD_COUNT = 6;
 const EMPTY_LABEL = "—";
+const TAIPEI_DATE_FMT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Taipei",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
 
 function naCell(label = EMPTY_LABEL, reason = "資料不足", meta = {}) {
   return { label, triggered: null, detail: reason, ...meta };
@@ -59,6 +65,34 @@ function padOldestFirst(cells) {
   return out;
 }
 
+function taipeiDateIso(today = new Date()) {
+  const parts = Object.fromEntries(
+    TAIPEI_DATE_FMT.formatToParts(today)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function lastDayIsoOfMonth(monthKey) {
+  const [year, month] = String(monthKey ?? "")
+    .split("-")
+    .map(Number);
+  if (!Number.isInteger(year) || !Number.isInteger(month)) return "";
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return [
+    String(year).padStart(4, "0"),
+    String(month).padStart(2, "0"),
+    String(lastDay).padStart(2, "0"),
+  ].join("-");
+}
+
+function isMonthClosed(monthKey, today = new Date()) {
+  const month = String(monthKey ?? "");
+  if (!/^\d{4}-\d{2}$/.test(month)) return false;
+  return taipeiDateIso(today) >= lastDayIsoOfMonth(month);
+}
+
 function monthEndRows(quotes, dateKey = "日期") {
   if (!Array.isArray(quotes) || quotes.length === 0) return [];
   const byMonth = new Map();
@@ -70,21 +104,57 @@ function monthEndRows(quotes, dateKey = "日期") {
   return [...byMonth.entries()].map(([label, row]) => ({ label, row }));
 }
 
-export function buildMonthEndAxis(quotes) {
-  return monthEndRows(quotes).map(({ label, row }) => {
-    const date = String(row?.["日期"] ?? "");
-    return {
-      label,
-      monthLabel: label,
-      date,
-      dateIso: date,
-      row,
-    };
-  });
+export function buildMonthEndAxis(quotes, today = new Date()) {
+  return monthEndRows(quotes)
+    .filter(({ label }) => isMonthClosed(label, today))
+    .map(({ label, row }) => {
+      const date = String(row?.["日期"] ?? "");
+      return {
+        label,
+        monthLabel: label,
+        date,
+        dateIso: date,
+        row,
+      };
+    });
+}
+
+function quarterEndMonthKey(quarterKey) {
+  const parsed = parseYQ(quarterKey);
+  if (!parsed) return null;
+  return `${parsed.year}-${String(parsed.quarter * 3).padStart(2, "0")}`;
+}
+
+export function buildQuarterlyAxis(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  const byQuarter = new Map();
+  for (const row of sortAscByKey(rows, "年季")) {
+    const quarterKey = String(row?.["年季"] ?? "");
+    if (!parseYQ(quarterKey)) continue;
+    byQuarter.set(quarterKey, row);
+  }
+  return [...byQuarter.entries()]
+    .map(([quarterKey, row]) => {
+      const monthLabel = quarterEndMonthKey(quarterKey);
+      const date = monthLabel ? lastDayIsoOfMonth(monthLabel) : "";
+      return {
+        label: formatYQ(quarterKey),
+        quarterKey,
+        monthLabel,
+        date,
+        dateIso: date,
+        row,
+      };
+    })
+    .slice(-RECENT_PERIOD_COUNT);
 }
 
 function axisMonthLabel(axisEntry) {
   return String(axisEntry?.monthLabel ?? axisEntry?.label ?? EMPTY_LABEL);
+}
+
+function axisDisplayLabel(axisEntry) {
+  return String(axisEntry?.label ?? axisMonthLabel(axisEntry));
 }
 
 function axisDate(axisEntry) {
@@ -225,10 +295,14 @@ function checkQuarterlyYOYDeclineSeries(incomeQ, field, thresholdPct, axis) {
   const sorted = sortDescByKey(incomeQ, "年季");
   if (Array.isArray(axis) && axis.length > 0) {
     return axis.map((axisEntry) => {
-      const quarterKey = settledQuarterKeyForMonthLabel(
-        axisMonthLabel(axisEntry),
-      );
-      const label = quarterKey ? formatYQ(quarterKey) : EMPTY_LABEL;
+      const quarterKey =
+        axisEntry?.quarterKey ??
+        settledQuarterKeyForMonthLabel(axisMonthLabel(axisEntry));
+      const label = axisEntry?.quarterKey
+        ? axisDisplayLabel(axisEntry)
+        : quarterKey
+          ? formatYQ(quarterKey)
+          : EMPTY_LABEL;
       const index = sorted.findIndex(
         (row) => String(row?.["年季"]) === quarterKey,
       );
@@ -263,10 +337,18 @@ function checkS11(incomeQ, axis) {
   return checkQuarterlyYOYDeclineSeries(incomeQ, "稅後純益", -5, axis);
 }
 
+function checkS11Quarterly(incomeQ, axis) {
+  return checkQuarterlyYOYDeclineSeries(incomeQ, "稅後純益", -5, axis);
+}
+
 /**
  * S12：連續兩季單季營業利益YOY衰退5%
  */
 function checkS12(incomeQ, axis) {
+  return checkQuarterlyYOYDeclineSeries(incomeQ, "營業利益", -5, axis);
+}
+
+function checkS12Quarterly(incomeQ, axis) {
   return checkQuarterlyYOYDeclineSeries(incomeQ, "營業利益", -5, axis);
 }
 
@@ -322,10 +404,14 @@ function checkS13(incomeQ, axis) {
   const sorted = sortDescByKey(incomeQ, "年季");
   if (Array.isArray(axis) && axis.length > 0) {
     return axis.map((axisEntry) => {
-      const quarterKey = settledQuarterKeyForMonthLabel(
-        axisMonthLabel(axisEntry),
-      );
-      const label = quarterKey ? formatYQ(quarterKey) : EMPTY_LABEL;
+      const quarterKey =
+        axisEntry?.quarterKey ??
+        settledQuarterKeyForMonthLabel(axisMonthLabel(axisEntry));
+      const label = axisEntry?.quarterKey
+        ? axisDisplayLabel(axisEntry)
+        : quarterKey
+          ? formatYQ(quarterKey)
+          : EMPTY_LABEL;
       const index = sorted.findIndex(
         (row) => String(row?.["年季"]) === quarterKey,
       );
@@ -345,6 +431,10 @@ function checkS13(incomeQ, axis) {
   }
 
   return periods;
+}
+
+function checkS13Quarterly(incomeQ, axis) {
+  return checkS13(incomeQ, axis);
 }
 
 /**
@@ -517,8 +607,15 @@ function checkS22(quotes, stats, axis) {
  * @param {Array<Object>|null} params.stats       md_cm_ta_dailystatistics（5Y 日頻）
  * @returns {{ rules: Array<{code: string, name: string, frequency: string, detail: string, periods: Array<{label: string, triggered: boolean|null, detail: string}>, latest: object, triggered: boolean}>, alertCount: number, latestAlertCount: number, latestAvailableCount: number, latestNaCount: number }}
  */
-export function computeRuleAlerts({ monthsales, incomeQ, quotes, stats } = {}) {
-  const fullAxis = buildMonthEndAxis(quotes);
+export function computeRuleAlerts({
+  monthsales,
+  incomeQ,
+  quotes,
+  stats,
+  today = new Date(),
+} = {}) {
+  const fullAxis = buildMonthEndAxis(quotes, today);
+  const quarterlyAxis = buildQuarterlyAxis(incomeQ);
   const hasFullAxis = fullAxis.length > 0;
   const rules = [
     {
@@ -542,6 +639,8 @@ export function computeRuleAlerts({ monthsales, incomeQ, quotes, stats } = {}) {
       frequency: "quarterly",
       detail: "",
       periods: checkS11(incomeQ, fullAxis),
+      displayPeriods:
+        quarterlyAxis.length > 0 ? checkS11Quarterly(incomeQ, quarterlyAxis) : [],
     },
     {
       code: "S12",
@@ -549,6 +648,8 @@ export function computeRuleAlerts({ monthsales, incomeQ, quotes, stats } = {}) {
       frequency: "quarterly",
       detail: "",
       periods: checkS12(incomeQ, fullAxis),
+      displayPeriods:
+        quarterlyAxis.length > 0 ? checkS12Quarterly(incomeQ, quarterlyAxis) : [],
     },
     {
       code: "S13",
@@ -556,6 +657,8 @@ export function computeRuleAlerts({ monthsales, incomeQ, quotes, stats } = {}) {
       frequency: "quarterly",
       detail: "",
       periods: checkS13(incomeQ, fullAxis),
+      displayPeriods:
+        quarterlyAxis.length > 0 ? checkS13Quarterly(incomeQ, quarterlyAxis) : [],
     },
     {
       code: "S22",
@@ -576,11 +679,15 @@ export function computeRuleAlerts({ monthsales, incomeQ, quotes, stats } = {}) {
     const periods = hasFullAxis
       ? (rule.periods ?? [])
       : padOldestFirst(rule.periods ?? []);
-    const recentPeriods = padOldestFirst(periods);
+    const displayPeriods = rule.displayPeriods ?? [];
+    const recentPeriods = padOldestFirst(
+      displayPeriods.length > 0 ? displayPeriods : periods,
+    );
     const latest = recentPeriods[RECENT_PERIOD_COUNT - 1] ?? null;
     return {
       ...rule,
       periods,
+      displayPeriods,
       recentPeriods,
       latest,
       triggered: latest?.triggered === true,
@@ -601,7 +708,12 @@ export function computeRuleAlerts({ monthsales, incomeQ, quotes, stats } = {}) {
     latestNaCount,
     fullPeriodScores: hasFullAxis ? computePeriodScores({ rules }) : [],
     recentPeriodScores: computePeriodScores({
-      rules: rules.map((rule) => ({ ...rule, periods: rule.recentPeriods })),
+      rules: rules.map((rule) => ({
+        ...rule,
+        periods: hasFullAxis
+          ? padOldestFirst(rule.periods ?? [])
+          : rule.recentPeriods,
+      })),
     }),
   };
 }

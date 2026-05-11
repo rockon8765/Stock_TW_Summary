@@ -117,6 +117,50 @@ test("buildMonthEndAxis returns oldest-first actual month-end trading dates", ()
   );
 });
 
+test("buildMonthEndAxis excludes the unfinished Taipei calendar month", () => {
+  const quotes = makeMonthEndQuotes([
+    "2026-03-31",
+    "2026-04-30",
+    "2026-05-08",
+  ]);
+
+  const axis = buildMonthEndAxis(
+    quotes,
+    new Date("2026-05-08T01:00:00+08:00"),
+  );
+
+  assert.deepEqual(
+    axis.map((period) => period.monthLabel),
+    ["2026-03", "2026-04"],
+  );
+});
+
+test("buildMonthEndAxis uses Taipei month-end boundaries", () => {
+  const quotes = makeMonthEndQuotes(["2026-03-31", "2026-04-30"]);
+
+  assert.deepEqual(
+    buildMonthEndAxis(
+      quotes,
+      new Date("2026-04-29T12:00:00+08:00"),
+    ).map((period) => period.monthLabel),
+    ["2026-03"],
+  );
+  assert.deepEqual(
+    buildMonthEndAxis(
+      quotes,
+      new Date("2026-04-30T23:59:00+08:00"),
+    ).map((period) => period.monthLabel),
+    ["2026-03", "2026-04"],
+  );
+  assert.deepEqual(
+    buildMonthEndAxis(
+      quotes,
+      new Date("2026-05-01T00:30:00+08:00"),
+    ).map((period) => period.monthLabel),
+    ["2026-03", "2026-04"],
+  );
+});
+
 test("computeRuleAlerts returns all seven live rule codes", () => {
   const result = computeRuleAlerts({});
   assert.deepEqual(
@@ -345,6 +389,53 @@ test("quarterly rules repeat the last settled quarter across monthly axis cells"
     findRule(result, "S11").periods.map((period) => period.label),
     ["2024Q4", "2024Q4", "2025Q1", "2025Q1", "2025Q1", "2025Q2"],
   );
+});
+
+test("quarterly rules use six distinct quarter labels for recent UI periods", () => {
+  const result = computeRuleAlerts({
+    today: new Date("2026-05-08T12:00:00+08:00"),
+    quotes: makeMonthEndQuotes([
+      "2025-11-28",
+      "2025-12-31",
+      "2026-01-30",
+      "2026-02-27",
+      "2026-03-31",
+      "2026-04-30",
+      "2026-05-08",
+    ]),
+    incomeQ: makeQuarterRows(),
+  });
+
+  assert.deepEqual(
+    findRule(result, "S11").recentPeriods.map((period) => period.label),
+    ["2024Q3", "2024Q4", "2025Q1", "2025Q2", "2025Q3", "2025Q4"],
+  );
+  assert.deepEqual(
+    findRule(result, "S13").recentPeriods.map((period) => period.label),
+    ["2024Q3", "2024Q4", "2025Q1", "2025Q2", "2025Q3", "2025Q4"],
+  );
+});
+
+test("recentPeriodScores stay aligned to the monthly overlay axis", () => {
+  const result = computeRuleAlerts({
+    today: new Date("2026-05-08T12:00:00+08:00"),
+    quotes: makeMonthEndQuotes([
+      "2025-11-28",
+      "2025-12-31",
+      "2026-01-30",
+      "2026-02-27",
+      "2026-03-31",
+      "2026-04-30",
+      "2026-05-08",
+    ]),
+    incomeQ: makeQuarterRows(),
+  });
+
+  assert.deepEqual(
+    result.recentPeriodScores.map((score) => score.label),
+    ["2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04"],
+  );
+  assert.ok(result.recentPeriodScores.every((score) => !score.label.includes("Q")));
 });
 
 test("computeRuleAlerts keeps recent UI periods when quotes are unavailable", () => {
