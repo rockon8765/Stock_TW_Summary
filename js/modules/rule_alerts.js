@@ -33,10 +33,8 @@ function normalizePeriods(rule) {
 }
 
 function dotMeta(triggered) {
-  if (triggered === true)
-    return { className: "dot dot-on", symbol: "●" };
-  if (triggered === false)
-    return { className: "dot dot-off", symbol: "○" };
+  if (triggered === true) return { className: "dot dot-on", symbol: "●" };
+  if (triggered === false) return { className: "dot dot-off", symbol: "○" };
   return { className: "dot dot-na", symbol: "—" };
 }
 
@@ -47,9 +45,12 @@ function renderSummary(ruleResult, rules) {
     rules.filter((rule) => rule.triggered).length;
   const latestAvailableCount =
     ruleResult.latestAvailableCount ??
-    rules.filter((rule) => rule.latest != null && rule.latest.triggered !== null).length;
+    rules.filter(
+      (rule) => rule.latest != null && rule.latest.triggered !== null,
+    ).length;
   const latestNaCount =
-    ruleResult.latestNaCount ?? Math.max(0, rules.length - latestAvailableCount);
+    ruleResult.latestNaCount ??
+    Math.max(0, rules.length - latestAvailableCount);
 
   if (latestAvailableCount === 0) return "即時規則警示資料不足";
 
@@ -75,7 +76,8 @@ function renderPeriodCell(period) {
 
 function renderRuleRow(rule) {
   const periods = normalizePeriods(rule);
-  const frequencyLabel = FREQUENCY_LABELS[rule.frequency] ?? rule.frequency ?? "";
+  const frequencyLabel =
+    FREQUENCY_LABELS[rule.frequency] ?? rule.frequency ?? "";
   const rowTitle = escapeHtml(rule.detail || rule.name || rule.code || "");
 
   return `
@@ -114,10 +116,9 @@ export function renderRuleAlerts(ruleResult) {
   el.innerHTML = `
     <div class="rule-alerts">
       <div class="rule-alerts-header">
-        <span class="rule-alerts-title">即時規則警示（Live API 近似訊號 · 近 6 期）</span>
+        <span class="rule-alerts-title">即時規則警示（近 6 期）</span>
         <span class="rule-alerts-summary">${summary}</span>
       </div>
-      <div class="rule-alerts-summary">部分規則為前端即時近似訊號，可能與 ScoreCard 快照不同。資料不足以計算的儲存格顯示 —。</div>
       <div class="rule-alerts-table-scroll">
         <table class="rule-alerts-table">
           <tbody>

@@ -35,16 +35,30 @@ test("renderInsiderGovernance groups pledge columns inside each holder group", (
       },
     ]);
 
-    assert.match(container.innerHTML, /<th colspan="3">董監<\/th>/);
-    assert.match(container.innerHTML, /<th colspan="3">經理人<\/th>/);
-    assert.match(container.innerHTML, /<th colspan="3">大股東<\/th>/);
-    assert.doesNotMatch(container.innerHTML, /<th colspan="3">設質比例<\/th>/);
+    assert.match(container.innerHTML, /<th colspan="3"[^>]*>董監<\/th>/);
+    assert.match(container.innerHTML, /<th colspan="3"[^>]*>經理人<\/th>/);
+    assert.match(container.innerHTML, /<th colspan="3"[^>]*>大股東<\/th>/);
+    assert.doesNotMatch(
+      container.innerHTML,
+      /<th colspan="3"[^>]*>設質比例<\/th>/,
+    );
     assert.equal(
-      (container.innerHTML.match(/<th class="text-center">持股%<\/th>/g) ??
-        []).length,
+      (container.innerHTML.match(/<th[^>]*>持股%<\/th>/g) ?? []).length,
       3,
     );
-    assert.match(container.innerHTML, /<td class="text-center">12\.30%<\/td>/);
+    assert.equal(
+      (
+        container.innerHTML.match(
+          /<th[^>]*\bgroup-start\b[^>]*>持股%<\/th>/g,
+        ) ?? []
+      ).length,
+      3,
+      "every 持股% header should sit at the start of its column group",
+    );
+    assert.match(
+      container.innerHTML,
+      /<td class="text-center group-start">12\.30%<\/td>/,
+    );
     assert.match(
       container.innerHTML,
       /12\.30%[\s\S]*10\.00%[\s\S]*1\.20%[\s\S]*20\.00%[\s\S]*45\.60%[\s\S]*30\.00%/,

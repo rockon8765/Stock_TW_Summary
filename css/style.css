@@ -186,6 +186,25 @@ html, body { background: var(--color-surface-900); }
   font-weight: 500;
 }
 
+.data-table th.text-center,
+.data-table td.text-center {
+  text-align: center;
+}
+
+/* 公司治理表：用 col group + 分隔線視覺切出 董監 / 經理人 / 大股東 三個區塊 */
+.governance-table {
+  table-layout: fixed;
+}
+.governance-table .gov-col-month   { width: 8%; }
+.governance-table .gov-col-pct     { width: 9%; }
+.governance-table .gov-col-delta   { width: 9%; }
+.governance-table .gov-col-pledge  { width: 12.66%; }
+.governance-table th.group-start,
+.governance-table td.group-start {
+  border-left: 1px solid rgba(148, 163, 184, 0.45);
+  padding-left: 1.25rem;
+}
+
 .data-table tbody tr:nth-child(even) {
   background: rgba(51, 65, 85, 0.12);
 }
