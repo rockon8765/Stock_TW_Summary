@@ -41,6 +41,7 @@ import {
   computeRuleAlerts,
 } from "./lib/rule_engine.js";
 import { aggregateDividendsToAnnual } from "./lib/dividend_aggregator.js";
+import { createSearchController } from "./lib/search_controller.js";
 import {
   buildLoadingMarkup,
   latestRowByKey,
@@ -48,6 +49,7 @@ import {
   showError,
 } from "./utils.js";
 import { createRetryableSnapshotLoader } from "./lib/strategy_snapshot_loader.js";
+import { resolveTickerInput } from "./lib/ticker_resolver.js";
 
 let abortController = null;
 const strategySnapshotLoader = createRetryableSnapshotLoader(
@@ -59,6 +61,7 @@ const searchForm = document.getElementById("ticker-search-form");
 const searchBtn = document.getElementById("search-btn");
 const printExportBtn = document.getElementById("print-export-btn");
 const jsonExportBtn = document.getElementById("json-export-btn");
+const searchHint = document.getElementById("search-hint");
 const welcomeMsg = document.getElementById("welcome-msg");
 const dataContainer = document.getElementById("data-container");
 const dataAsOf = document.getElementById("data-as-of");
@@ -95,6 +98,18 @@ function setExportButtonsEnabled(isEnabled) {
     button.disabled = !isEnabled;
     button.setAttribute("aria-disabled", String(!isEnabled));
   });
+}
+
+function showSearchHint(message) {
+  if (!searchHint) return;
+  searchHint.textContent = message;
+  searchHint.classList.remove("hidden");
+}
+
+function hideSearchHint() {
+  if (!searchHint) return;
+  searchHint.textContent = "";
+  searchHint.classList.add("hidden");
 }
 
 function updateExportPayload(ticker, data) {
@@ -225,6 +240,7 @@ function resetSections() {
 async function search(ticker) {
   if (!ticker) return;
 
+  hideSearchHint();
   if (abortController) abortController.abort();
   abortController = new AbortController();
   const { signal } = abortController;
@@ -331,6 +347,7 @@ async function search(ticker) {
       incomeQ: data.income?.data,
       quotes: data.quotes?.data,
       stats: data.stats?.data,
+      today: new Date(),
     });
     ruleScore = computeAlertScore(
       ruleResult.latestAvailableCount,
@@ -608,21 +625,27 @@ if (klineToggle) {
   });
 }
 
-// Debounce
-let debounceTimer;
-function debouncedSearch() {
-  const ticker = tickerInput.value.trim();
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => search(ticker), 300);
-}
+const searchController = createSearchController({
+  resolver: resolveTickerInput,
+  onResolved: (ticker) => search(ticker),
+  onResolvedRewrite: (ticker) => {
+    if (tickerInput && tickerInput.value !== ticker) tickerInput.value = ticker;
+  },
+  onHint: (message) => {
+    if (message) showSearchHint(message);
+    else hideSearchHint();
+  },
+});
 
 if (searchForm) {
   searchForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    debouncedSearch();
+    searchController.submit(tickerInput?.value);
   });
 } else if (searchBtn) {
-  searchBtn.addEventListener("click", debouncedSearch);
+  searchBtn.addEventListener("click", () =>
+    searchController.submit(tickerInput?.value),
+  );
 }
 
 dataContainer.addEventListener("click", (event) => {
