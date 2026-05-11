@@ -18,11 +18,11 @@
       <div class="flex flex-col lg:flex-row lg:items-center gap-4">
         <h1 class="text-xl font-bold text-accent shrink-0">StockOnePage</h1>
         <form id="ticker-search-form" role="search" class="flex items-center gap-2 flex-1 max-w-md">
-          <label for="ticker-input" class="sr-only">股票代號</label>
+          <label for="ticker-input" class="sr-only">股票代號或名稱</label>
           <input
             id="ticker-input"
             type="text"
-            placeholder="輸入股票代號，例如 2330"
+            placeholder="輸入股票代號或名稱，例如 2330 或 台積電"
             class="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent placeholder-slate-500"
           >
           <button
@@ -44,6 +44,7 @@
           >下載 JSON</button>
         </div>
       </div>
+      <div id="search-hint" class="hidden text-xs text-amber-300" aria-live="polite"></div>
       <div id="data-as-of" class="text-xs text-muted min-h-[1rem]" aria-live="polite">資料時間：—</div>
       <p class="text-[11px] text-muted/80 mt-1 leading-snug">
         ※ 當日（最新交易日）成交量與三大法人買賣超為盤中數據，盤後零股／鉅額交易與當日修正資料於隔一交易日補齊。
@@ -55,7 +56,7 @@
 
     <!-- 初始提示 -->
     <div id="welcome-msg" class="text-center py-20 text-slate-500">
-      <p class="text-lg">輸入股票代號開始查詢</p>
+      <p class="text-lg">輸入股票代號或名稱開始查詢</p>
     </div>
 
     <!-- 資料區塊容器（預設隱藏） -->
