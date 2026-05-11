@@ -109,6 +109,42 @@ test("data-table text-center utility overrides default numeric alignment", () =>
   );
 });
 
+test("governance table keeps holder columns equal-width with symmetric padding", () => {
+  const css = readFileSync(
+    new URL("../css/style.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    css,
+    /#governance-table-container \.data-table\s*\{\s*table-layout: fixed;/,
+  );
+  assert.match(
+    css,
+    /#governance-table-container \.data-table thead tr:first-child th:first-child\s*\{\s*width: 8%;/,
+  );
+  assert.match(
+    css,
+    /#governance-table-container \.data-table th,\s*#governance-table-container \.data-table td:not\(:first-child\)\s*\{\s*text-align: center;/,
+  );
+  assert.match(
+    css,
+    /#governance-table-container \.data-table thead tr:first-child th:first-child,\s*#governance-table-container \.data-table tbody td:first-child\s*\{\s*text-align: left;/,
+  );
+  assert.match(
+    css,
+    /\.governance-table \.gov-col-pct,\s*\.governance-table \.gov-col-delta,\s*\.governance-table \.gov-col-pledge\s*\{\s*width: 10\.2222%;\s*\}/,
+  );
+  assert.doesNotMatch(css, /\.governance-table \.gov-group-header/);
+  assert.doesNotMatch(css, /\.governance-table \.gov-group-label/);
+
+  const groupStartRule = css.match(
+    /\.governance-table th\.group-start,\s*\.governance-table td\.group-start\s*\{[^}]+\}/,
+  )?.[0];
+  assert.ok(groupStartRule);
+  assert.doesNotMatch(groupStartRule, /padding-left/);
+});
+
 test("renderProfile escapes upstream text before writing to innerHTML", () => {
   withMockDocument({ "profile-content": { innerHTML: "" } }, (elements) => {
     renderProfile(

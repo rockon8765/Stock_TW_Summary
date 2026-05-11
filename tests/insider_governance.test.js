@@ -35,9 +35,10 @@ test("renderInsiderGovernance groups pledge columns inside each holder group", (
       },
     ]);
 
-    assert.match(container.innerHTML, /<th colspan="3"[^>]*>董監<\/th>/);
-    assert.match(container.innerHTML, /<th colspan="3"[^>]*>經理人<\/th>/);
-    assert.match(container.innerHTML, /<th colspan="3"[^>]*>大股東<\/th>/);
+    assert.match(container.innerHTML, /<th colspan="3" class="group-start text-center">董監<\/th>/);
+    assert.match(container.innerHTML, /<th colspan="3" class="group-start text-center">經理人<\/th>/);
+    assert.match(container.innerHTML, /<th colspan="3" class="group-start text-center">大股東<\/th>/);
+    assert.doesNotMatch(container.innerHTML, /gov-group-label/);
     assert.doesNotMatch(
       container.innerHTML,
       /<th colspan="3"[^>]*>設質比例<\/th>/,

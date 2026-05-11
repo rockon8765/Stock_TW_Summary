@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
+    "data:build:stock-index": "node tools/build_stock_name_index.mjs",
     "data:fetch:dottdot": "node tools/data-verify/fetch_dottdot.mjs",
     "data:fetch:twse": "node tools/data-verify/fetch_twse.mjs",
     "data:manual:mops": "node tools/data-verify/fetch_mops.mjs",

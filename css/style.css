@@ -192,17 +192,36 @@ html, body { background: var(--color-surface-900); }
 }
 
 /* 公司治理表：用 col group + 分隔線視覺切出 董監 / 經理人 / 大股東 三個區塊 */
+#governance-table-container .data-table {
+  table-layout: fixed;
+}
+
+#governance-table-container .data-table thead tr:first-child th:first-child {
+  width: 8%;
+}
+
+#governance-table-container .data-table th,
+#governance-table-container .data-table td:not(:first-child) {
+  text-align: center;
+}
+
+#governance-table-container .data-table thead tr:first-child th:first-child,
+#governance-table-container .data-table tbody td:first-child {
+  text-align: left;
+}
+
 .governance-table {
   table-layout: fixed;
 }
 .governance-table .gov-col-month   { width: 8%; }
-.governance-table .gov-col-pct     { width: 9%; }
-.governance-table .gov-col-delta   { width: 9%; }
-.governance-table .gov-col-pledge  { width: 12.66%; }
+.governance-table .gov-col-pct,
+.governance-table .gov-col-delta,
+.governance-table .gov-col-pledge {
+  width: 10.2222%;
+}
 .governance-table th.group-start,
 .governance-table td.group-start {
   border-left: 1px solid rgba(148, 163, 184, 0.45);
-  padding-left: 1.25rem;
 }
 
 .data-table tbody tr:nth-child(even) {

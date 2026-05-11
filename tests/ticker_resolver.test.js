@@ -35,6 +35,26 @@ test("resolveTickerInput resolves exact and unique partial Chinese names", async
   assert.equal(await resolveTickerInput("台積", { ensureLoad }), "2330");
 });
 
+test("resolveTickerInput resolves company names from a stock name index", async () => {
+  let strategyCalls = 0;
+  const loadNameIndex = async () => [
+    {
+      ticker: "2454",
+      names: ["聯發科", "聯發科技股份有限公司"],
+    },
+  ];
+  const ensureLoad = async () => {
+    strategyCalls += 1;
+    return { status: "loaded", holdingData: [] };
+  };
+
+  assert.equal(
+    await resolveTickerInput("聯發科", { ensureLoad, loadNameIndex }),
+    "2454",
+  );
+  assert.equal(strategyCalls, 0);
+});
+
 test("resolveTickerInput returns null for ambiguous or missing names", async () => {
   const ensureLoad = async () => ({
     status: "loaded",
