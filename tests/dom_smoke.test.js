@@ -42,6 +42,9 @@ test("index.html keeps the CSP, search semantics, and live data timestamp hooks"
 
   assert.match(html, /Content-Security-Policy/);
   assert.match(html, /id="ticker-search-form"[^>]*role="search"/);
+  assert.match(html, /for="ticker-input"[^>]*>股票代號或名稱</);
+  assert.match(html, /placeholder="輸入股票代號或名稱[^"]*"/);
+  assert.match(html, /id="search-hint"[^>]*aria-live="polite"/);
   assert.match(html, /id="data-as-of"[^>]*aria-live="polite"/);
   assert.match(html, /src="vendor\/tailwindcss-play-cdn\.js"/);
   assert.match(
@@ -92,6 +95,18 @@ test("index.html discloses that alert score overlay is not point-in-time", () =>
   assert.match(html, /高分代表警示較多/);
   assert.match(html, /非歷史可投資訊號/);
   assert.match(html, /季財報公告日延遲未列入計算/);
+});
+
+test("data-table text-center utility overrides default numeric alignment", () => {
+  const css = readFileSync(
+    new URL("../css/style.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    css,
+    /\.data-table th\.text-center,\s*\.data-table td\.text-center\s*\{\s*text-align: center;/,
+  );
 });
 
 test("renderProfile escapes upstream text before writing to innerHTML", () => {
