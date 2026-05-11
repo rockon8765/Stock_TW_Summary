@@ -35,6 +35,7 @@ jobs:
           cp index.html _site/
           cp -R css js _site/
           cp scorecard_web.json _site/
+          cp stock_name_index.json _site/
           cp strategy_ticker_holding_summary.csv _site/
           cp strategy_ticker_trade_analysis_summary.csv _site/
 

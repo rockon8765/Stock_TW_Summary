@@ -56,11 +56,13 @@ python -m http.server 8000
 npx serve .
 ```
 
-GitHub Pages 會在 `main` 更新後透過 `.github/workflows/deploy-pages.yml` 自動部署，只上傳網站需要的靜態檔案（`index.html`、`css/`、`js/`、`scorecard_web.json` 與策略摘要 CSV）。
+GitHub Pages 會在 `main` 更新後透過 `.github/workflows/deploy-pages.yml` 自動部署，只上傳網站需要的靜態檔案（`index.html`、`css/`、`js/`、`scorecard_web.json`、`stock_name_index.json` 與策略摘要 CSV）。
 
 策略績效摘要檔預設會從 `js/config.js` 的 `APP_CONFIG.strategyDataBaseUrl` 指定位置讀取；目前預設為 `./`，也就是直接讀取 repo 根目錄的 `strategy_ticker_holding_summary.csv` 與 `strategy_ticker_trade_analysis_summary.csv`。更新資料時，請先重新產生 summary，再同步到 `StockOnePage` repo 根目錄後部署。
 
 策略買入分數區塊依賴 repo 根目錄的 `scorecard_web.json`。這個檔案是靜態部署資產，更新 ScoreCard / 策略矩陣資料後，請先執行 `ScoreCard_V2_New/export_scorecard_to_web.py` 重新產生，再把新的 `scorecard_web.json` 一起提交與部署。
+
+中文股票名稱搜尋依賴 repo 根目錄的 `stock_name_index.json`。這個檔案由 Dottdot `bd_cm_companyprofile` 的 `股票代號`、`股票名稱`、`中文簡稱`、`公司名稱` 產生；更新公司主檔時，請執行 `npm run data:build:stock-index` 重新產生後一起提交。
 
 ## License
 
