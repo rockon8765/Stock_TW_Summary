@@ -149,6 +149,9 @@ function ensureScoreSeries() {
   const lineOptions = {
     color: "#fbbf24",
     lineWidth: 2,
+    lineType: LightweightCharts.LineType.WithSteps,
+    pointMarkersVisible: true,
+    pointMarkersRadius: 2,
     priceScaleId: "left",
     priceFormat: {
       type: "custom",
