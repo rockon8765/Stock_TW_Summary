@@ -72,7 +72,15 @@ export function renderKline(data) {
       horzLines: { color: "#334155" },
     },
     crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-    rightPriceScale: { borderColor: "#475569" },
+    rightPriceScale: {
+      borderColor: "#475569",
+      scaleMargins: { top: 0.3, bottom: 0.3 },
+    },
+    leftPriceScale: {
+      visible: true,
+      borderColor: "#475569",
+      scaleMargins: { top: 0.05, bottom: 0.75 },
+    },
     timeScale: {
       borderColor: "#475569",
       timeVisible: false,
@@ -130,13 +138,26 @@ export function renderKline(data) {
   resizeObserver.observe(container);
 }
 
+function formatScoreAxisTick(price) {
+  const value = Number(price);
+  if (!Number.isFinite(value) || value < 0 || value > 10) return "";
+  return value.toFixed(1);
+}
+
 function ensureScoreSeries() {
   if (!chart || scoreOverlaySeries) return;
   const lineOptions = {
     color: "#fbbf24",
     lineWidth: 2,
-    priceScaleId: "score",
-    priceFormat: { type: "price", precision: 1, minMove: 0.1 },
+    priceScaleId: "left",
+    priceFormat: {
+      type: "custom",
+      minMove: 0.1,
+      formatter: formatScoreAxisTick,
+    },
+    autoscaleInfoProvider: () => ({
+      priceRange: { minValue: 0, maxValue: 10 },
+    }),
   };
   if (LightweightCharts.LineSeries) {
     scoreOverlaySeries = chart.addSeries(
@@ -146,11 +167,6 @@ function ensureScoreSeries() {
   } else if (chart.addLineSeries) {
     scoreOverlaySeries = chart.addLineSeries(lineOptions);
   }
-  if (!scoreOverlaySeries) return;
-  chart.priceScale("score").applyOptions({
-    scaleMargins: { top: 0.1, bottom: 0.7 },
-    mode: 1,
-  });
 }
 
 // 從目前 allData 推出指定 range 的起始日期；allData 為空時回 null（不設下界）
