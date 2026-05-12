@@ -159,6 +159,7 @@ function installKlineTestGlobals() {
     CandlestickSeries: "CandlestickSeries",
     CrosshairMode: { Normal: 0 },
     HistogramSeries: "HistogramSeries",
+    LineType: { Simple: 0, WithSteps: 1, Curved: 2 },
     LineSeries: "LineSeries",
     createChart(_container, options) {
       state.createChartOptions = options;
@@ -456,7 +457,7 @@ test("setRuleScoreOverlay called AFTER user picked 3M still respects active rang
   }
 });
 
-test("renderKline configures rule score line on a fixed 0-10 visible left axis", () => {
+test("renderKline configures rule score line as stepped points on a fixed 0-10 visible left axis", () => {
   const ctx = installKlineTestGlobals();
 
   try {
@@ -473,6 +474,12 @@ test("renderKline configures rule score line on a fixed 0-10 visible left axis",
     assert.ok(scoreSeries);
     assert.equal(scoreSeries.options.priceScaleId, "left");
     assert.equal(scoreSeries.options.color, "#fbbf24");
+    assert.equal(
+      scoreSeries.options.lineType,
+      LightweightCharts.LineType.WithSteps,
+    );
+    assert.equal(scoreSeries.options.pointMarkersVisible, true);
+    assert.equal(scoreSeries.options.pointMarkersRadius, 2);
     assert.equal(scoreSeries.options.priceFormat.type, "custom");
     assert.equal(scoreSeries.options.priceFormat.formatter(5), "5.0");
     assert.equal(scoreSeries.options.priceFormat.formatter(-4), "");
