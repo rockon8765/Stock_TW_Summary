@@ -38,6 +38,10 @@ function installKlineTestGlobals() {
   const crosshairHandlers = [];
   const clickHandlers = [];
   const unsubscribeCalls = [];
+  const state = {
+    createChartOptions: null,
+    priceScaleApplyCalls: [],
+  };
   const buttons = [
     makeRangeButton("3M"),
     makeRangeButton("6M"),
@@ -86,9 +90,11 @@ function installKlineTestGlobals() {
         setData() {},
       };
     },
-    priceScale() {
+    priceScale(id) {
       return {
-        applyOptions() {},
+        applyOptions(options) {
+          state.priceScaleApplyCalls.push({ id, options });
+        },
       };
     },
     timeScale() {
@@ -154,7 +160,8 @@ function installKlineTestGlobals() {
     CrosshairMode: { Normal: 0 },
     HistogramSeries: "HistogramSeries",
     LineSeries: "LineSeries",
-    createChart() {
+    createChart(_container, options) {
+      state.createChartOptions = options;
       return chartApi;
     },
   };
@@ -165,6 +172,7 @@ function installKlineTestGlobals() {
     clickHandlers,
     container,
     crosshairHandlers,
+    state,
     unsubscribeCalls,
     restore() {
       global.document = originalDocument;
@@ -336,6 +344,8 @@ test("renderKline subscribes tooltip handlers, renders OHLC tooltip, and cleans 
     assert.match(tooltip.innerHTML, /108\.00/);
     assert.match(tooltip.innerHTML, /1,200\.00 張/);
     assert.match(tooltip.innerHTML, /1,200,000 股/);
+    assert.match(tooltip.innerHTML, /警示分數/);
+    assert.match(tooltip.innerHTML, /6\.5/);
 
     ctx.crosshairHandlers[0]({
       point: null,
@@ -446,7 +456,7 @@ test("setRuleScoreOverlay called AFTER user picked 3M still respects active rang
   }
 });
 
-test("setRuleScoreOverlay renders non-null score points on an amber line series", () => {
+test("renderKline configures rule score line on a fixed 0-10 visible left axis", () => {
   const ctx = installKlineTestGlobals();
 
   try {
@@ -461,8 +471,33 @@ test("setRuleScoreOverlay renders non-null score points on an amber line series"
       (series) => series.type === "LineSeries",
     );
     assert.ok(scoreSeries);
-    assert.equal(scoreSeries.options.priceScaleId, "score");
+    assert.equal(scoreSeries.options.priceScaleId, "left");
     assert.equal(scoreSeries.options.color, "#fbbf24");
+    assert.equal(scoreSeries.options.priceFormat.type, "custom");
+    assert.equal(scoreSeries.options.priceFormat.formatter(5), "5.0");
+    assert.equal(scoreSeries.options.priceFormat.formatter(-4), "");
+    assert.equal(scoreSeries.options.priceFormat.formatter(12), "");
+    assert.deepEqual(scoreSeries.options.autoscaleInfoProvider(), {
+      priceRange: { minValue: 0, maxValue: 10 },
+    });
+    assert.equal(ctx.state.createChartOptions.leftPriceScale.visible, true);
+    assert.deepEqual(ctx.state.createChartOptions.leftPriceScale.scaleMargins, {
+      top: 0.05,
+      bottom: 0.75,
+    });
+    assert.deepEqual(ctx.state.createChartOptions.rightPriceScale.scaleMargins, {
+      top: 0.3,
+      bottom: 0.3,
+    });
+    assert.deepEqual(
+      ctx.state.priceScaleApplyCalls.find((call) => call.id === "volume")
+        ?.options,
+      { scaleMargins: { top: 0.8, bottom: 0 } },
+    );
+    assert.equal(
+      ctx.state.priceScaleApplyCalls.find((call) => call.id === "score"),
+      undefined,
+    );
     assert.deepEqual(scoreSeries.data, [
       { time: "2026-01-31", value: 8 },
       { time: "2026-03-31", value: 6.5 },
