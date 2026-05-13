@@ -30,6 +30,11 @@ function metricCard(label, value, decimals, suffix = "") {
   `;
 }
 
+function sanitizePe(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number !== 0 ? number : null;
+}
+
 function calcTrailing4qEPS(incomeData) {
   if (!incomeData?.length) return null;
   const sorted = sortDescByKey(incomeData, "年季");
@@ -71,8 +76,8 @@ export function renderProfile(profileData, quotesData, bsData, incomeData) {
   const changeP = quote?.["漲幅"];
   const date = quote?.["日期"] || "";
 
-  const pe = quote?.["本益比"];
-  const pe4 = quote?.["本益比4"];
+  const peTtm = sanitizePe(quote?.["本益比4"]);
+  const peEstimate = sanitizePe(quote?.["本益比"]);
   const pb = quote?.["股價淨值比"];
   const mktCap = quote?.["總市值"];
   const turnover = quote?.["週轉率"];
@@ -117,8 +122,8 @@ export function renderProfile(profileData, quotesData, bsData, incomeData) {
     </div>
 
     <div class="metric-cards">
-      ${metricCard("PE", pe, 1)}
-      ${metricCard("PE\u2084(預估)", pe4, 1)}
+      ${metricCard("PE", peTtm, 1)}
+      ${metricCard("PE(預估)", peEstimate, 1)}
       ${metricCard("PB", pb, 2)}
       ${metricCard("每股淨值", bv, 2)}
       ${metricCard("EPS(近4季)", eps4q, 2)}

@@ -51,6 +51,28 @@ function makeSalesRows() {
   }));
 }
 
+function renderSummaryWithQuote(quote) {
+  let html = "";
+  withMockElement("stock-summary-content", (container) => {
+    stockSummary.renderStockSummary({
+      profile: [{ 股票代號: "2330", 股票名稱: "台積電" }],
+      quotes: [
+        {
+          日期: "2026-03-31",
+          收盤價: 120,
+          ...quote,
+        },
+      ],
+      sales: [],
+      income: [],
+      dividend: [],
+      ruleScore: null,
+    });
+    html = container.innerHTML;
+  });
+  return html;
+}
+
 test("stock summary classifiers handle nulls, valuation, growth, and narrative text", () => {
   assert.equal(typeof stockSummary.classifyValuation, "function");
   assert.equal(typeof stockSummary.classifyGrowth, "function");
@@ -236,7 +258,7 @@ test("renderStockSummary renders a narrative, chips, and escaped content", () =>
           收盤價: 120,
           漲跌: 5,
           漲幅: 4.35,
-          本益比: 21.5,
+          本益比4: 21.5,
           股價淨值比: 2.3,
         },
       ],
@@ -273,6 +295,7 @@ test("renderStockSummary renders a narrative, chips, and escaped content", () =>
     assert.doesNotMatch(container.innerHTML, /規則評分/);
     assert.match(container.innerHTML, /class="score-card-large alert-mid"/);
     assert.match(container.innerHTML, /6\.0/);
+    assert.match(container.innerHTML, /估值偏高/);
     assert.match(container.innerHTML, /警示 2 \/ 可評估 5 \/ 資料不足 2/);
     assert.match(container.innerHTML, /殖利率/);
     assert.match(container.innerHTML, /最近年度宣告現金股利/);
@@ -287,6 +310,20 @@ test("renderStockSummary renders a narrative, chips, and escaped content", () =>
       /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/,
     );
   });
+});
+
+test("renderStockSummary uses PE4 for valuation narrative without falling back to estimated PE", () => {
+  assert.match(renderSummaryWithQuote({ 本益比4: 15 }), /估值合理/);
+  assert.match(
+    renderSummaryWithQuote({ 本益比: 5, 本益比4: 21.5 }),
+    /估值偏高/,
+  );
+  assert.match(renderSummaryWithQuote({ 本益比: 8 }), /估值資料不足/);
+  assert.match(
+    renderSummaryWithQuote({ 本益比: 0, 本益比4: 0 }),
+    /估值資料不足/,
+  );
+  assert.match(renderSummaryWithQuote({ 本益比4: -3 }), /PE 為負/);
 });
 
 test("renderStockSummary maps alert score levels to semantic color classes", () => {

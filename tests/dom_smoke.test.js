@@ -19,6 +19,17 @@ function withMockDocument(elements, fn) {
   }
 }
 
+function parseMetricCards(html) {
+  return [
+    ...html.matchAll(
+      /<div class="metric-card">\s*<div class="metric-label">([^<]+)<\/div>\s*<div class="metric-value">([^<]+)<\/div>/g,
+    ),
+  ].map((match) => ({
+    label: match[1].trim(),
+    value: match[2].trim(),
+  }));
+}
+
 test("index.html keeps the CSP, search semantics, and live data timestamp hooks", () => {
   const html = readFileSync(
     new URL("../index.html", import.meta.url),
@@ -182,6 +193,63 @@ test("renderProfile escapes upstream text before writing to innerHTML", () => {
     assert.match(innerHTML, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/);
     assert.match(innerHTML, /半導體 &amp; &lt;b&gt;測試&lt;\/b&gt;/);
   });
+});
+
+test("renderProfile maps PE cards to PE4 and estimated PE fields", () => {
+  withMockDocument({ "profile-content": { innerHTML: "" } }, (elements) => {
+    renderProfile(
+      [{ 股票代號: "2330", 股票名稱: "台積電" }],
+      [{ 日期: "2026-03-31", 本益比: 5, 本益比4: 21.5 }],
+      [],
+      [],
+    );
+
+    const cards = parseMetricCards(elements["profile-content"].innerHTML);
+    assert.equal(cards.find((card) => card.label === "PE")?.value, "21.5");
+    assert.equal(
+      cards.find((card) => card.label === "PE(預估)")?.value,
+      "5.0",
+    );
+    assert.equal(cards.find((card) => card.label.includes("PE₄")), undefined);
+  });
+});
+
+test("renderProfile renders missing or zero PE fields as dashes independently", () => {
+  const cases = [
+    {
+      quote: { 本益比: null, 本益比4: 18 },
+      expectedPe: "18.0",
+      expectedEstimate: "—",
+    },
+    {
+      quote: { 本益比: 12, 本益比4: null },
+      expectedPe: "—",
+      expectedEstimate: "12.0",
+    },
+    {
+      quote: { 本益比: 0, 本益比4: 0 },
+      expectedPe: "—",
+      expectedEstimate: "—",
+    },
+  ];
+
+  for (const { quote, expectedPe, expectedEstimate } of cases) {
+    withMockDocument({ "profile-content": { innerHTML: "" } }, (elements) => {
+      renderProfile(
+        [{ 股票代號: "2330", 股票名稱: "台積電" }],
+        [{ 日期: "2026-03-31", ...quote }],
+        [],
+        [],
+      );
+
+      const cards = parseMetricCards(elements["profile-content"].innerHTML);
+      assert.equal(cards.find((card) => card.label === "PE")?.value, expectedPe);
+      assert.equal(
+        cards.find((card) => card.label === "PE(預估)")?.value,
+        expectedEstimate,
+      );
+    });
+  }
 });
 
 test("renderStrategyScores escapes snapshot text in tooltips and headers, drops latest_date from DOM", () => {
