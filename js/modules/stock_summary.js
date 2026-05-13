@@ -248,7 +248,8 @@ export function renderStockSummary({
   const profileRow = Array.isArray(profile) ? profile[0] : profile;
   const quote = latestQuote(quotes);
   const close = Number(quote?.["收盤價"]);
-  const pe = quote?.["本益比"];
+  const peRaw = finiteNumber(quote?.["本益比4"]);
+  const pe = peRaw === 0 ? null : peRaw;
   const cashDividend = latestCashDividend(dividend);
   const dividendRatio =
     Number.isFinite(cashDividend) && Number.isFinite(close)
